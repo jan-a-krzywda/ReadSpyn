@@ -3,63 +3,60 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ReadSpyn"
-version = "0.1.0"
-authors = [
-  { name="Jan A. Krzywda", email="j.a.krzywda@liacs.leidenuniv.nl" },
-]
-description = "A comprehensive simulator for quantum dot readout systems with realistic noise models, RLC resonator sensors, and optional JAX acceleration for GPU/vectorized simulations."
+name = "readspyn"
+version = "2.0.0"
+description = "JAX-based quantum dot readout simulator with efficient state scanning"
 readme = "README.md"
 requires-python = ">=3.8"
-license = { text = "MIT" }
+license = {text = "MIT"}
+authors = [
+    {name = "Jan A. Krzywda", email = "j.a.krzywda@liacs.leidenuniv.nl"},
+    {name = "Rouven K. Koch", email = "R.K.Koch@tudelft.nl"}
+]
+keywords = ["quantum", "readout", "simulation", "jax", "quantum-dots"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
-    "Topic :: Scientific/Engineering :: Physics",
-    "Topic :: Scientific/Engineering :: Electronic Design Automation",
+    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Physics",
 ]
-keywords = ["quantum", "quantum-dots", "readout", "simulation", "noise", "RLC", "resonator", "jax", "gpu", "acceleration"]
+
 dependencies = [
-    "numpy>=1.20.0",
+    "jax>=0.4.0",
+    "jaxlib>=0.4.0",
+    "numpy>=1.21.0",
+    "matplotlib>=3.5.0",
     "scipy>=1.7.0",
-    "matplotlib>=3.3.0",
-    "tqdm>=4.60.0",
-    "numba>=0.56.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=6.0",
     "pytest-cov>=2.0",
-    "black>=21.0",
-    "flake8>=3.8",
-    "mypy>=0.800",
-]
-docs = [
-    "sphinx>=4.0",
-    "sphinx-rtd-theme>=0.5",
-    "nbsphinx>=0.8",
-]
-jax = [
-    "jax>=0.4.0",
-    "jaxlib>=0.4.0",
+    "black>=22.0",
+    "flake8>=4.0",
+    "mypy>=0.950",
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/jan-a-krzywda/ReadSpyn"
-"Bug Tracker" = "https://github.com/jan-a-krzywda/ReadSpyn/issues"
-"Documentation" = "https://readspyn.readthedocs.io/"
-"Source Code" = "https://github.com/jan-a-krzywda/ReadSpyn"
+Homepage = "https://github.com/jkrzywda/ReadSpyn"
+Repository = "https://github.com/jkrzywda/ReadSpyn"
+Documentation = "https://readspyn.readthedocs.io"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
-[tool.setuptools.package-data]
-"readout_simulator" = ["*.pyi", "py.typed"]
+[tool.black]
+line-length = 88
+target-version = ['py38']
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true

@@ -1,29 +1,23 @@
 """
-ReadSpyn: A Quantum Dot Readout Simulator
+ReadSpyn - JAX-based quantum dot readout simulator
 
-A comprehensive simulator for quantum dot readout systems with realistic noise models
-and RLC resonator sensors.
-
-Author: Jan A. Krzywda
-Email: j.a.krzywda@liacs.leidenuniv.nl
+A comprehensive simulator for quantum dot readout systems with realistic noise models,
+RLC resonator sensors, and efficient JAX-based state scanning.
 """
 
-from .simulator import ReadoutSimulator
+from .quantum_dot_system import QuantumDotSystem, GeometricQuantumDotSystem
 from .sensor_backend import RLC_sensor
-from .quantum_dot_system import QuantumDotSystem
-from .noise_models import OverFNoise
-from .noise import OU_noise, Telegraph_Noise, Over_f_noise
+from .noise_models import OU_noise, OverFNoise
+from .jax_simulator import JAXReadoutSimulator
 
-__version__ = "0.1.0"
-__author__ = "Jan A. Krzywda"
-__email__ = "j.a.krzywda@liacs.leidenuniv.nl"
+__version__ = "2.0.0"
+__author__ = "Jan A. Krzywda, Rouven Koch"
 
 __all__ = [
-    "ReadoutSimulator",
-    "RLC_sensor", 
     "QuantumDotSystem",
-    "OverFNoise",
+    "GeometricQuantumDotSystem",
+    "RLC_sensor", 
     "OU_noise",
-    "Telegraph_Noise",
-    "Over_f_noise"
+    "OverFNoise",
+    "JAXReadoutSimulator"
 ] 

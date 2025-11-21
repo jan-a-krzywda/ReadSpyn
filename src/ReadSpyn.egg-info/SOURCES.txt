@@ -1,4 +1,3 @@
-LICENCE
 README.md
 pyproject.toml
 src/ReadSpyn.egg-info/PKG-INFO
@@ -7,8 +6,12 @@ src/ReadSpyn.egg-info/dependency_links.txt
 src/ReadSpyn.egg-info/requires.txt
 src/ReadSpyn.egg-info/top_level.txt
 src/readout_simulator/__init__.py
-src/readout_simulator/noise.py
+src/readout_simulator/jax_simulator.py
 src/readout_simulator/noise_models.py
 src/readout_simulator/quantum_dot_system.py
 src/readout_simulator/sensor_backend.py
-src/readout_simulator/simulator.py
+src/readspyn.egg-info/PKG-INFO
+src/readspyn.egg-info/SOURCES.txt
+src/readspyn.egg-info/dependency_links.txt
+src/readspyn.egg-info/requires.txt
+src/readspyn.egg-info/top_level.txt

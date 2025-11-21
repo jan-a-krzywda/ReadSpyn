@@ -1,5 +1,34 @@
+# Python cache files
 src/readout_simulator/modules/__pycache__/*
 src/readout_simulator/modules/modules/__pycache__/*
 src/readout_simulator/__pycache__/*
 Readout_sim/__pycache__/*
 *.npy
+
+# LaTeX ancillary files
+*.aux
+*.log
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.toc
+*.out
+
+# Generated plots and images (but keep the main PDF and TEX files)
+*.png
+*.jpg
+*.jpeg
+# *.pdf  # Keep the main theory PDF
+
+# Debug and test files
+debug_*.py
+analyze_*.py
+correct_*.py
+test_*.py
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# OS files
+.DS_Store
+Thumbs.db

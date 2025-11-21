@@ -1,219 +1,155 @@
 # ReadSpyn Examples
 
-This directory contains example scripts demonstrating various features of the ReadSpyn quantum dot readout simulator.
+This directory contains example scripts demonstrating the JAX-based ReadSpyn implementation.
 
 ## Available Examples
 
-### 1. Basic Simulation (`basic_simulation.py`)
-**Purpose**: Introduction to ReadSpyn with a simple single-sensor system
-**Features**:
-- Single quantum dot system (2 dots, 1 sensor)
-- Basic noise models
-- Simple visualization
-- Performance analysis
+### 1. `white_noise_example.py`
+A comprehensive example demonstrating white noise effects in quantum dot readout.
 
-**Usage**:
+**Features:**
+- Two-dot, one-sensor system
+- White noise (OU noise) affecting capacitance
+- 1/f noise affecting energy offset
+- Signal quality analysis with SNR and separation metrics
+- I, Q scatter plots and performance visualization
+
+**Usage:**
 ```bash
-python3 basic_simulation.py
+python examples/white_noise_example.py
 ```
 
-**What you'll learn**:
-- How to create quantum dot systems
-- Basic sensor configuration
-- Running simulations
-- Extracting and analyzing results
+**Expected Output:**
+- Simulation parameters and system setup
+- Signal quality metrics (separation, noise level, SNR)
+- Performance analysis plots
+- Comprehensive noise effects demonstration
 
-### 2. Simple Two-Sensor System (`simple_two_sensor.py`)
-**Purpose**: Demonstrate multi-sensor capabilities with minimal complexity
-**Features**:
-- 2 quantum dots, 2 sensors
-- Different resonator parameters for each sensor
-- Different noise models for each sensor
-- Basic performance comparison
+### 2. `simple_1f_noise_example.py`
+A focused example demonstrating 1/f noise effects with asymmetric coupling.
 
-**Usage**:
+**Features:**
+- Two-dot, one-sensor system with asymmetric coupling
+- 1/f noise affecting energy offset (epsilon)
+- White noise (OU noise) affecting capacitance
+- Coulomb peak visualization showing asymmetric coupling
+- Parameter study of different 1/f noise amplitudes
+- Signal degradation analysis
+
+**Usage:**
 ```bash
-python3 simple_two_sensor.py
+python examples/simple_1f_noise_example.py
 ```
 
-**What you'll learn**:
-- Multi-sensor system setup
-- Parameter variation between sensors
-- Performance comparison between sensors
+**Expected Output:**
+- Coulomb peaks plot showing asymmetric coupling effects
+- Clean vs noisy signal comparison
+- 1/f noise parameter study results
+- Signal degradation analysis plots
+- Comprehensive noise effects demonstration
 
-### 3. Advanced Two-Sensor System (`two_sensor_system.py`)
-**Purpose**: Comprehensive multi-sensor analysis with advanced features
-**Features**:
-- 2 quantum dots, 2 sensors
-- Different resonator configurations
-- Comprehensive noise modeling
-- Advanced visualization and analysis
-- Charge state separation analysis
-- Sensor correlation analysis
+### 3. `geometric_system_example.py`
+A geometric example demonstrating quantum dot system creation from spatial positions.
 
-**Usage**:
+**Features:**
+- Geometric quantum dot system creation
+- Capacitance calculation from spatial positions
+- Basic simulation setup
+- System parameter demonstration
+
+**Usage:**
 ```bash
-python3 two_sensor_system.py
+python examples/geometric_system_example.py
 ```
 
-**What you'll learn**:
-- Advanced system configuration
-- Complex noise modeling
-- Detailed performance analysis
-- Multi-dimensional visualization
+**Expected Output:**
+- Geometric system setup and parameters
+- Capacitance matrix calculations
+- Basic simulation demonstration
 
-## Running the Examples
+## Key Features Demonstrated
 
-### Prerequisites
-Make sure you have ReadSpyn installed:
-```bash
-cd /path/to/ReadSpyn
-pip install -e .
-```
+### JAX-based Implementation
+- **Precomputed Noise Trajectories**: Noise is generated once and reused across all states
+- **State Scanning**: Uses JAX scan for efficient processing of multiple charge states
+- **Vectorized Operations**: All computations are vectorized for GPU acceleration
+- **Post-processing Noise**: White noise is added after signal generation
 
-### Basic Usage
-```bash
-cd examples
-python3 basic_simulation.py
-```
+### Noise Models
+- **OU_noise**: Ornstein-Uhlenbeck noise with exponential autocorrelation (white noise)
+- **OverFNoise**: 1/f noise using multiple fluctuators
+- **Precomputed Trajectories**: Efficient noise generation and reuse
 
-### Customizing Examples
-You can modify the examples to explore different configurations:
+### System Configurations
+- **Two-dot, one-sensor**: Asymmetric coupling demonstration
+- **Geometric systems**: Spatial position-based system creation
+- **Capacitive coupling**: Realistic quantum dot interactions
 
-#### Changing System Parameters
-```python
-# Modify quantum dot system
-Cdd = np.array([
-    [1.0, 0.5],  # Change coupling strength
-    [0.5, 1.0]
-])
+## Requirements
 
-# Modify sensor parameters
-params_resonator = {
-    'Lc': 1000e-9,  # Change inductance
-    'Cp': 0.8e-12,  # Change capacitance
-    'RL': 50,        # Change load resistance
-    # ... other parameters
-}
-```
+- Python 3.9+ with JAX installed
+- ReadSpyn package installed
+- Matplotlib for visualization
 
-#### Adjusting Noise Models
-```python
-# Modify 1/f noise
-eps_noise = OverFNoise(
-    n_fluctuators=10,     # Change number of fluctuators
-    s1=2e-3,             # Change noise amplitude
-    ommax=2,              # Change frequency range
-    ommin=0.1
-)
+## Running Examples
 
-# Modify OU noise
-c_noise = OU_noise(
-    sigma=1e-12,          # Change noise amplitude
-    gamma=1e6             # Change correlation rate
-)
-```
+1. **White Noise Example** (comprehensive noise effects):
+   ```bash
+   python examples/white_noise_example.py
+   ```
 
-#### Changing Simulation Parameters
-```python
-# Modify simulation settings
-nT_end = 2000            # Change simulation duration
-samples = 100            # Change number of samples
-params = {
-    'SNR_white': 1e13,   # Change signal-to-noise ratio
-    'eps0': 0.3          # Change operating point
-}
-```
+2. **1/f Noise Example** (asymmetric coupling effects):
+   ```bash
+   python examples/simple_1f_noise_example.py
+   ```
 
-## Example Output
+3. **Geometric System Example** (spatial system creation):
+   ```bash
+   python examples/geometric_system_example.py
+   ```
 
-### Basic Simulation
-- Creates a 2-dot, 1-sensor system
-- Runs simulation with 50 samples per charge state
-- Generates IQ plots and performance metrics
-- Shows time evolution of signals
+## Expected Performance
 
-### Two-Sensor Systems
-- Creates 2-dot, 2-sensor systems
-- Demonstrates different sensor configurations
-- Compares performance between sensors
-- Shows correlation analysis
-- Provides comprehensive visualizations
+The examples demonstrate significant performance improvements:
 
-## Understanding the Results
+- **Efficient JAX operations**: Vectorized computations
+- **GPU acceleration**: Compatible with JAX's GPU acceleration
+- **Scalable**: Performance scales well with number of states and realizations
 
-### IQ Plots
-- **X-axis**: In-phase component (I)
-- **Y-axis**: Quadrature component (Q)
-- **Colors**: Different charge states
-- **Clustering**: Well-separated clusters indicate good readout performance
+## Key Insights
 
-### Performance Metrics
-- **Fidelity**: Measure of readout accuracy (0-1, higher is better)
-- **SNR**: Signal-to-noise ratio evolution over time
-- **Separation**: Distance between different charge state clusters
+### White Noise Example
+- Demonstrates fundamental noise effects in quantum dot readout
+- Shows SNR scaling and signal quality metrics
+- Provides baseline for noise comparison
 
-### Time Evolution
-- Shows how signals develop over time
-- Demonstrates noise effects
-- Illustrates integration benefits
+### 1/f Noise Example
+- Demonstrates asymmetric coupling effects
+- Shows how 1/f noise affects different charge states differently
+- Provides realistic quantum dot system modeling
+- Demonstrates complex noise coupling patterns
+
+### Geometric System Example
+- Shows how to create systems from spatial positions
+- Demonstrates capacitance calculation methods
+- Provides foundation for realistic system modeling
 
 ## Troubleshooting
 
-### Common Issues
+If you encounter issues:
 
-#### 1. Import Errors
-**Problem**: `ModuleNotFoundError: No module named 'readout_simulator'`
-**Solution**: Ensure ReadSpyn is installed: `pip install -e .`
+1. **JAX Installation**: Ensure JAX is properly installed for your Python version
+2. **Import Errors**: Make sure the ReadSpyn package is in your Python path
+3. **Memory Issues**: Reduce the number of realizations or time points for large simulations
 
-#### 2. Memory Issues
-**Problem**: Out of memory errors
-**Solution**: Reduce `nT_end` or `samples` parameters
+## Customization
 
-#### 3. Slow Performance
-**Problem**: Simulations take too long
-**Solution**: 
-- Reduce simulation duration
-- Use fewer samples
-- Ensure Numba is working properly
+You can modify the examples to:
 
-#### 4. Visualization Issues
-**Problem**: Plots don't show or are empty
-**Solution**: Check that simulation completed successfully and data was extracted
+- Change quantum dot system parameters
+- Adjust noise model parameters
+- Modify simulation time and resolution
+- Add custom analysis functions
+- Integrate with your own workflows
 
-### Performance Tips
-
-1. **Start Small**: Begin with basic examples and small parameter values
-2. **Monitor Progress**: Watch the progress bars during simulation
-3. **Check Output**: Verify that conductance values are reasonable
-4. **Adjust Parameters**: Modify parameters to see their effects
-
-## Next Steps
-
-After running the examples:
-
-1. **Experiment**: Modify parameters to see their effects
-2. **Scale Up**: Increase system size or simulation duration
-3. **Customize**: Adapt examples for your specific research needs
-4. **Analyze**: Use the analysis functions to understand your results
-5. **Extend**: Create new examples for different system configurations
-
-## Contributing
-
-Feel free to:
-- Modify existing examples
-- Create new examples
-- Improve visualizations
-- Add new analysis features
-- Report issues or suggest improvements
-
-## Support
-
-If you encounter problems:
-1. Check this README for troubleshooting tips
-2. Review the main README.md file
-3. Check the API_REFERENCE.md for detailed documentation
-4. Open an issue on GitHub
-5. Contact the author: j.a.krzywda@liacs.leidenuniv.nl
-
-Happy simulating! 🚀 
+The examples serve as templates for building your own quantum dot readout simulations using the JAX-based ReadSpyn implementation. 

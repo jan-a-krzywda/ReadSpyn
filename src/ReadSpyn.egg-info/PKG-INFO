@@ -1,270 +1,181 @@
 Metadata-Version: 2.4
-Name: ReadSpyn
-Version: 0.1.0
-Summary: A comprehensive simulator for quantum dot readout systems with realistic noise models, RLC resonator sensors, and optional JAX acceleration for GPU/vectorized simulations.
-Author-email: "Jan A. Krzywda" <j.a.krzywda@liacs.leidenuniv.nl>
+Name: readspyn
+Version: 2.0.0
+Summary: JAX-based quantum dot readout simulator with efficient state scanning
+Author-email: "Jan A. Krzywda" <j.a.krzywda@liacs.leidenuniv.nl>, "Rouven K. Koch" <R.K.Koch@tudelft.nl>
 License: MIT
-Project-URL: Homepage, https://github.com/jan-a-krzywda/ReadSpyn
-Project-URL: Bug Tracker, https://github.com/jan-a-krzywda/ReadSpyn/issues
-Project-URL: Documentation, https://readspyn.readthedocs.io/
-Project-URL: Source Code, https://github.com/jan-a-krzywda/ReadSpyn
-Keywords: quantum,quantum-dots,readout,simulation,noise,RLC,resonator,jax,gpu,acceleration
-Classifier: Development Status :: 3 - Alpha
+Project-URL: Homepage, https://github.com/jkrzywda/ReadSpyn
+Project-URL: Repository, https://github.com/jkrzywda/ReadSpyn
+Project-URL: Documentation, https://readspyn.readthedocs.io
+Keywords: quantum,readout,simulation,jax,quantum-dots
+Classifier: Development Status :: 4 - Beta
 Classifier: Intended Audience :: Science/Research
-Classifier: Topic :: Scientific/Engineering :: Physics
-Classifier: Topic :: Scientific/Engineering :: Electronic Design Automation
+Classifier: License :: OSI Approved :: MIT License
 Classifier: Programming Language :: Python :: 3
 Classifier: Programming Language :: Python :: 3.8
 Classifier: Programming Language :: Python :: 3.9
 Classifier: Programming Language :: Python :: 3.10
 Classifier: Programming Language :: Python :: 3.11
-Classifier: License :: OSI Approved :: MIT License
-Classifier: Operating System :: OS Independent
+Classifier: Topic :: Scientific/Engineering :: Physics
 Requires-Python: >=3.8
 Description-Content-Type: text/markdown
-License-File: LICENCE
-Requires-Dist: numpy>=1.20.0
+Requires-Dist: jax>=0.4.0
+Requires-Dist: jaxlib>=0.4.0
+Requires-Dist: numpy>=1.21.0
+Requires-Dist: matplotlib>=3.5.0
 Requires-Dist: scipy>=1.7.0
-Requires-Dist: matplotlib>=3.3.0
-Requires-Dist: tqdm>=4.60.0
-Requires-Dist: numba>=0.56.0
 Provides-Extra: dev
 Requires-Dist: pytest>=6.0; extra == "dev"
 Requires-Dist: pytest-cov>=2.0; extra == "dev"
-Requires-Dist: black>=21.0; extra == "dev"
-Requires-Dist: flake8>=3.8; extra == "dev"
-Requires-Dist: mypy>=0.800; extra == "dev"
-Provides-Extra: docs
-Requires-Dist: sphinx>=4.0; extra == "docs"
-Requires-Dist: sphinx-rtd-theme>=0.5; extra == "docs"
-Requires-Dist: nbsphinx>=0.8; extra == "docs"
-Provides-Extra: jax
-Requires-Dist: jax>=0.4.0; extra == "jax"
-Requires-Dist: jaxlib>=0.4.0; extra == "jax"
-Dynamic: license-file
+Requires-Dist: black>=22.0; extra == "dev"
+Requires-Dist: flake8>=4.0; extra == "dev"
+Requires-Dist: mypy>=0.950; extra == "dev"
 
-# ReadSpyn: Quantum Dot Readout Simulator
+# ReadSpyn 2.0 - JAX-based Quantum Dot Readout Simulator
 
-<img src="icon.png" alt="ReadSpyn Icon" width="250" />
+<div align="center">
+  <img src="https://raw.githubusercontent.com/google/jax/main/images/jax_logo_250px.png" alt="JAX Logo" width="200"/>
+  
+  [![PyPI version](https://badge.fury.io/py/readspyn.svg)](https://badge.fury.io/py/readspyn)
+  [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+  [![JAX](https://img.shields.io/badge/JAX-0.4.0+-orange.svg)](https://github.com/google/jax)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+  [![arXiv](https://img.shields.io/badge/arXiv-Quantum%20Computing-blue.svg)](https://arxiv.org/)
+  [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.12345678-blue.svg)](https://doi.org/)
+</div>
 
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![PyPI version](https://badge.fury.io/py/readspyn.svg)](https://badge.fury.io/py/readspyn)
+A high-performance simulator for quantum dot readout systems using JAX for efficient vectorized operations and state scanning.
 
-A comprehensive simulator for quantum dot readout systems with realistic noise models and RLC resonator sensors. ReadSpyn enables researchers to simulate and analyze the performance of quantum dot readout systems under various noise conditions.
+## Key Features
 
-## Features
-
-- **Quantum Dot System Modeling**: Simulate systems with multiple quantum dots and capacitive coupling
-- **RLC Resonator Sensors**: Realistic modeling of resonator-based readout sensors
-- **Advanced Noise Models**: 
-  - Ornstein-Uhlenbeck processes
-  - 1/f noise with multiple fluctuators
-  - Telegraph noise for two-level systems
-- **Signal Processing**: IQ demodulation and signal analysis
-- **Performance Analysis**: Readout fidelity calculations and visualization tools
+- **JAX-based implementation** for GPU acceleration and efficient vectorization
+- **Precomputed noise trajectories** for improved performance
+- **State scanning** using JAX scan for efficient processing of multiple charge states
+- **White noise post-processing** for flexible noise modeling
+- **Multiple noise models** including Ornstein-Uhlenbeck and 1/f noise
+- **RLC resonator sensors** with realistic circuit modeling
 
 ## Installation
 
-### From Source
-
 ```bash
-git clone https://github.com/jan-a-krzywda/ReadSpyn.git
+pip install readspyn
+```
+
+For development installation:
+```bash
+git clone https://github.com/jkrzywda/ReadSpyn.git
 cd ReadSpyn
 pip install -e .
 ```
 
-### Dependencies
-
-ReadSpyn requires the following Python packages:
-- numpy >= 1.20.0
-- scipy >= 1.7.0
-- matplotlib >= 3.3.0
-- tqdm >= 4.60.0
-- numba >= 0.56.0
-
 ## Quick Start
 
 ```python
-import numpy as np
-from readout_simulator import QuantumDotSystem, RLC_sensor, ReadoutSimulator
-from readout_simulator import OverFNoise, OU_noise
-
-# Create a quantum dot system
-Cdd = np.array([[1, 0], [0, 1]])  # 2x2 dot-dot capacitance matrix
-Cds = np.array([[1], [0.1]])      # 2x1 dot-sensor coupling matrix
-dot_system = QuantumDotSystem(Cdd, Cds)
-
-# Configure resonator parameters
-params_resonator = {
-    'Lc': 800e-9,      # Inductance (H)
-    'Cp': 0.5e-12,     # Capacitance (F)
-    'RL': 40,          # Load resistance (Ω)
-    'Rc': 100e6,       # Coupling resistance (Ω)
-    'Z0': 50           # Characteristic impedance (Ω)
-}
-
-# Configure Coulomb peak parameters
-params_coulomb_peak = {
-    'g0': 1/50/1e6,    # Maximum conductance (S)
-    'eps0': 0.5,       # Operating point (relative to width)
-    'eps_width': 1      # Energy width (eV)
-}
-
-# Create noise models
-eps_noise = OverFNoise(
-    n_fluctuators=5, s1=1e-3, sigma_couplings=1e-99,
-    ommax=1, ommin=0.2, dt=1, equally_dist=True
+import jax
+import jax.numpy as jnp
+from readout_simulator import (
+    QuantumDotSystem, 
+    RLC_sensor, 
+    JAXReadoutSimulator,
+    OU_noise, 
+    OverFNoise
 )
 
-c_noise = OU_noise(sigma=1e-13, gamma=1e5)
+# Define quantum dot system
+Cdd = jnp.array([[1, 0], [0, 1]])  # 2x2 dot-dot capacitance matrix
+Cds = jnp.array([[1], [0.1]]) * 0.6  # 2x1 dot-sensor coupling matrix
+dot_system = QuantumDotSystem(Cdd, Cds)
 
-# Create sensor
+# Configure sensor
+params_resonator = {
+    'Lc': 800e-9,
+    'Cp': 0.5e-12,
+    'RL': 40,
+    'Rc': 100e6,
+    'Z0': 50
+}
+
+params_coulomb_peak = {
+    'g0': 1/50/1e6,
+    'eps0': 0.5,
+    'eps_width': 1
+}
+
+# Create noise model and sensor
+eps_noise = OverFNoise(n_fluctuators=3, S1=1e-6, sigma_couplings=0.1,
+                       ommax=1e6, ommin=1e3, equally_dist=True)
+c_noise = OU_noise(sigma=1e-12, gamma=1e5)
 sensor = RLC_sensor(params_resonator, params_coulomb_peak, c_noise, eps_noise)
 
 # Create simulator
-simulator = ReadoutSimulator(dot_system, [sensor])
+simulator = JAXReadoutSimulator(dot_system, [sensor])
 
-# Define charge states to simulate
-charge_states = [np.array([1, 0]), np.array([0, 1)] * 25  # 50 total states
+# Define simulation parameters
+t_end = 1000 * sensor.T0
+dt = 0.5e-9
+times = jnp.arange(0, t_end, dt)
+charge_states = jnp.array([[1, 0], [0, 1], [1, 1]])
+
+# Precompute noise trajectories
+key = jax.random.PRNGKey(42)
+simulator.precompute_noise(key, times, n_realizations=50, noise_model=eps_noise)
 
 # Run simulation
-params = {'SNR_white': 1e12, 'eps0': 0.5}
-simulator.run_simulation(charge_states, 2500, params)
+params = {'SNR_white': 10, 'eps0': 0.5}
+results = simulator.run_simulation(charge_states, times, params, key)
 
-# Get results
-IQ_data, times = simulator.get_int_IQ()
-fidelity = simulator.calculate_fidelity()
-
+# Analyze results
+I_integrated, Q_integrated = simulator.get_integrated_IQ(sensor_idx=0)
+fidelity = simulator.calculate_fidelity(sensor_idx=0)
 print(f"Readout fidelity: {fidelity:.3f}")
 ```
 
-## Documentation
+## Architecture
 
-### Core Classes
+### Core Components
 
-#### QuantumDotSystem
-Models a system of quantum dots with capacitive coupling.
+1. **QuantumDotSystem**: Represents the quantum dot system with capacitance matrices
+2. **RLC_sensor**: Models RLC resonator sensors with realistic circuit behavior
+3. **JAXReadoutSimulator**: Main simulator using JAX for efficient computation
+4. **Noise Models**: JAX-compatible noise generators (OU_noise, OverFNoise)
 
-```python
-# Create from capacitance matrices
-dot_system = QuantumDotSystem(Cdd, Cds)
+### Key Innovations
 
-# Or generate random system
-dot_system = QuantumDotSystem.from_random(num_dots=2, num_sensors=1)
-```
+- **Precomputed Noise**: Noise trajectories are generated once and reused across all states
+- **State Scanning**: Uses JAX scan to efficiently process multiple charge states
+- **Vectorized Operations**: All computations are vectorized for GPU acceleration
+- **Post-processing Noise**: White noise is added after signal generation for flexibility
 
-#### RLC_sensor
-Simulates an RLC resonator sensor for quantum dot readout.
+## Performance
 
-```python
-sensor = RLC_sensor(
-    params_resonator=resonator_params,
-    params_coulomb_peak=coulomb_params,
-    c_noise_model=capacitance_noise,
-    eps_noise_model=energy_noise
-)
-```
+The JAX-based implementation provides significant performance improvements:
 
-#### ReadoutSimulator
-Orchestrates simulations across multiple sensors and charge states.
-
-```python
-simulator = ReadoutSimulator(dot_system, sensors)
-simulator.run_simulation(charge_states, t_end, params)
-```
-
-### Noise Models
-
-#### Ornstein-Uhlenbeck (OU) Noise
-```python
-ou_noise = OU_noise(sigma=1e-13, gamma=1e5)
-```
-
-#### 1/f Noise
-```python
-flicker_noise = OverFNoise(
-    n_fluctuators=10, s1=1e-3, sigma_couplings=0.1,
-    ommax=1, ommin=0.1, dt=1e-3
-)
-```
-
-#### Telegraph Noise
-```python
-telegraph_noise = Telegraph_Noise(sigma=1e-12, gamma=1e6)
-```
+- **GPU acceleration** support through JAX
+- **Vectorized state processing** using JAX scan
+- **Precomputed noise trajectories** eliminate redundant calculations
+- **Efficient memory usage** through JAX's functional programming model
 
 ## Examples
 
-### Basic Simulation
-See `examples/basic_simulation.ipynb` for a complete working example.
+See the `examples/` directory for detailed usage examples:
 
-### Noise Analysis
-```python
-# Analyze noise characteristics
-from readout_simulator.noise import get_spectrum
+- `jax_example.ipynb`: Basic JAX-based simulation example
+- Additional examples demonstrating advanced features
 
-frequencies, power_spectrum = get_spectrum(noise_trajectory, dt, total_time)
-plt.loglog(frequencies, power_spectrum)
-plt.xlabel('Frequency (Hz)')
-plt.ylabel('Power Spectral Density')
-```
+## Dependencies
 
-### Performance Analysis
-```python
-# Calculate readout fidelity
-fidelity = simulator.calculate_fidelity(sensor_index=0)
-
-# Plot IQ results
-simulator.plot_results()
-
-# Get raw signals
-raw_signals = simulator.get_raw_signal()
-```
-
-## Advanced Usage
-
-### Custom Noise Models
-You can create custom noise models by inheriting from the base noise classes:
-
-```python
-class CustomNoise:
-    def __init__(self, amplitude):
-        self.amplitude = amplitude
-        self.x = 0
-    
-    def update(self, dt):
-        # Implement your noise model here
-        self.x += self.amplitude * np.random.normal(0, 1) * np.sqrt(dt)
-        return self.x
-```
-
-### Multi-Sensor Systems
-```python
-# Create multiple sensors with different parameters
-sensors = [
-    RLC_sensor(params_resonator1, params_coulomb_peak1, noise1, noise2),
-    RLC_sensor(params_resonator2, params_coulomb_peak2, noise3, noise4)
-]
-
-simulator = ReadoutSimulator(dot_system, sensors)
-```
+- JAX >= 0.4.0
+- NumPy >= 1.21.0
+- Matplotlib >= 3.5.0
+- SciPy >= 1.7.0
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
+Contributions are welcome! Please feel free to submit pull requests or open issues.
 
-### Development Setup
-```bash
-git clone https://github.com/jan-a-krzywda/ReadSpyn.git
-cd ReadSpyn
-pip install -e ".[dev]"
-```
+## License
 
-### Running Tests
-```bash
-pytest tests/
-```
+This project is licensed under the MIT License.
 
 ## Citation
 
@@ -272,33 +183,15 @@ If you use ReadSpyn in your research, please cite:
 
 ```bibtex
 @software{readspyn2024,
-  title={ReadSpyn: Quantum Dot Readout Simulator},
+  title={ReadSpyn: JAX-based Quantum Dot Readout Simulator},
   author={Krzywda, Jan A.},
   year={2024},
-  url={https://github.com/jan-a-krzywda/ReadSpyn}
+  url={https://github.com/jkrzywda/ReadSpyn}
 }
 ```
 
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- Leiden University for research support
-- The quantum computing community for feedback and suggestions
-
 ## Contact
 
-- **Author**: Jan A. Krzywda
-- **Email**: j.a.krzywda@liacs.leidenuniv.nl
-- **GitHub**: [@jan-a-krzywda](https://github.com/jan-a-krzywda)
-
-## Changelog
-
-### v0.1.0 (2024-12-19)
-- Initial release
-- Core simulation functionality
-- Multiple noise models
-- RLC sensor implementation
-- Comprehensive documentation 
+- Author: Jan A. Krzywda, Rouven K. Koch
+- Email: j.a.krzywda@liacs.leidenuniv.nl
+- GitHub: https://github.com/jkrzywda/ReadSpyn 
