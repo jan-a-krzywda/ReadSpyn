@@ -390,27 +390,37 @@ class RLC_sensor:
         
         conductances = jax.vmap(conductance_fun)(eps_values)
         
-        # Generate source voltage
-        V_s_t = jnp.sin(self.omega0 * times)
+        # Generate source voltage with a mild ramp-on to reduce startup transient.
+        dt = times[1] - times[0]
+        ramp_cycles = params.get('ramp_cycles', 8.0)
+        ramp_time = ramp_cycles * (2 * jnp.pi / self.omega0)
+        ramp = 1.0 - jnp.exp(-times / ramp_time)
+        V_s_t = ramp * jnp.sin(self.omega0 * times)
         
         # Calculate reflected voltage (simplified model for JAX compatibility)
         # This is a simplified version that avoids ODE solving for efficiency
         V_refl_t = V_s_t * (1 - conductances / (conductances + self.Z0))
         
-        # Extract I and Q components using simplified demodulation
-        # For JAX compatibility, we use a simpler approach than Hilbert transform
-        I = V_refl_t * jnp.cos(self.omega0 * times)
-        Q = V_refl_t * jnp.sin(self.omega0 * times)
+        # Demodulate to baseband using standard IQ scaling and sign convention.
+        I_mixed = 2.0 * V_refl_t * jnp.cos(self.omega0 * times)
+        Q_mixed = -2.0 * V_refl_t * jnp.sin(self.omega0 * times)
         
-        # Apply low-pass filtering (simplified)
+        # Apply a one-pole IIR low-pass to suppress residual 2*omega0 content
+        # without over-smoothing the readout envelope.
         def low_pass_filter(signal):
-            # Simple moving average as low-pass filter
-            window_size = min(10, len(signal) // 10)
-            kernel = jnp.ones(window_size) / window_size
-            return jnp.convolve(signal, kernel, mode='same')
+            cutoff_factor = params.get('cutoff_factor', 0.15)
+            tau = 1.0 / (cutoff_factor * self.omega0)
+            alpha = dt / (tau + dt)
+
+            def step(y_prev, x):
+                y = y_prev + alpha * (x - y_prev)
+                return y, y
+
+            _, y = jax.lax.scan(step, signal[0], signal)
+            return y
         
-        I = low_pass_filter(I)
-        Q = low_pass_filter(Q)
+        I = low_pass_filter(I_mixed)
+        Q = low_pass_filter(Q_mixed)
         
         # Add white noise to I and Q before integration
         # According to the specification:
