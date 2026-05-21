@@ -7,7 +7,7 @@ RLC resonator sensors, and efficient JAX-based state scanning.
 
 from .quantum_dot_system import QuantumDotSystem, GeometricQuantumDotSystem
 from .sensor_backend import RLC_sensor
-from .noise_models import OU_noise, OverFNoise
+from .noise_models import OU_noise, OverFNoise, SpectrumNoise
 from .jax_simulator import JAXReadoutSimulator
 
 __version__ = "2.0.0"

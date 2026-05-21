@@ -1,164 +1,201 @@
-# ReadSpyn 2.0 - JAX-based Quantum Dot Readout Simulator
+# ReadSpyn — RF Reflectometry Readout Simulator for Quantum Dot Systems
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/google/jax/main/images/jax_logo_250px.png" alt="JAX Logo" width="200"/>
-  
-  [![PyPI version](https://badge.fury.io/py/readspyn.svg)](https://badge.fury.io/py/readspyn)
-  [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-  [![JAX](https://img.shields.io/badge/JAX-0.4.0+-orange.svg)](https://github.com/google/jax)
-  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-  [![arXiv](https://img.shields.io/badge/arXiv-Quantum%20Computing-blue.svg)](https://arxiv.org/)
-  [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.12345678-blue.svg)](https://doi.org/)
+
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![JAX](https://img.shields.io/badge/JAX-0.4.0+-orange.svg)](https://github.com/google/jax)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 </div>
 
-A high-performance simulator for quantum dot readout systems using JAX for efficient vectorized operations and state scanning.
+**ReadSpyn** is a time-domain simulator for RF reflectometry readout of
+semiconductor quantum dot (QD) systems.  
+It solves the RLC resonator circuit ODE in the presence of realistic charge
+noise and produces IQ-demodulated quadrature traces that closely resemble
+experimental time series.
 
-## Key Features
+> **Theory & assumptions** — see [`notes/ReadSpyn_Model_Summary.pdf`](notes/ReadSpyn_Model_Summary.pdf)
+> (or the LaTeX source [`notes/ReadSpyn_Model_Summary.tex`](notes/ReadSpyn_Model_Summary.tex)).
 
-- **JAX-based implementation** for GPU acceleration and efficient vectorization
-- **Precomputed noise trajectories** for improved performance
-- **State scanning** using JAX scan for efficient processing of multiple charge states
-- **White noise post-processing** for flexible noise modeling
-- **Multiple noise models** including Ornstein-Uhlenbeck and 1/f noise
-- **RLC resonator sensors** with realistic circuit modeling
+---
+
+## Features
+
+| Feature | Details |
+|---|---|
+| **Self-consistent circuit ODE** | Full Radau integration of the RLC equations; no perturbative approximations |
+| **Coulomb peak model** | Analytic `cosh⁻²` conductance; operating-point position visualised on the peak |
+| **Flexible noise models** | Spectrum-prescribed 1/*f* noise (`SpectrumNoise`), Ornstein–Uhlenbeck (`OU_noise`), telegraph |
+| **Multi-dot / multi-sensor** | Capacitance-matrix formalism; arbitrary *N* dots × *M* sensors |
+| **IQ demodulation** | Hilbert-transform demodulation with window-padding edge correction |
+| **JAX back-end** | Optional JAX path (`jax_simulator.py`) for GPU/TPU acceleration and `jax.scan` state sweeps |
+| **Animated output** | Animated GIF of IQ-plane comet trajectories |
+
+---
+
+## Repository Layout
+
+```
+ReadSpyn/
+├── src/
+│   └── readout_simulator/
+│       ├── __init__.py            # public API: QuantumDotSystem, RLC_sensor
+│       ├── quantum_dot_system.py  # CI model, capacitance matrices, energy offsets
+│       ├── sensor_backend.py      # RLC ODE, IQ demodulation, get_signal()
+│       ├── noise_models.py        # SpectrumNoise, OU_noise, telegraph noise
+│       ├── jax_simulator.py       # optional JAX-based simulator
+│       ├── iaaft.py               # IAAFT surrogate time-series helper
+│       └── helper_functions.py    # shared utilities
+│
+├── examples/
+│   ├── single_dot_1f_noise.ipynb  # single dot, 10 realisations of 1/f noise
+│   ├── two_dot_iq_gif.ipynb       # two-dot IQ trajectories + animated GIF
+│   ├── two_dot_iq.gif             # example output GIF
+│   └── minimal_no_noise_single_dot.py
+│
+├── notes/
+│   ├── ReadSpyn_Model_Summary.tex   # LaTeX model summary (theory + limitations)
+│   ├── ReadSpyn_Model_Summary.pdf   # compiled PDF
+│   └── ReadSpyn_Theory_and_Assumptions.tex  # extended theory reference
+│
+├── pyproject.toml
+└── README.md
+```
+
+---
 
 ## Installation
 
 ```bash
-pip install readspyn
-```
-
-For development installation:
-```bash
-git clone https://github.com/jkrzywda/ReadSpyn.git
+git clone https://github.com/jan-a-krzywda/ReadSpyn.git
 cd ReadSpyn
 pip install -e .
 ```
 
-## Quick Start
+JAX is an optional but recommended dependency for the JAX back-end:
 
-```python
-import jax
-import jax.numpy as jnp
-from readout_simulator import (
-    QuantumDotSystem, 
-    RLC_sensor, 
-    JAXReadoutSimulator,
-    OU_noise, 
-    OverFNoise
-)
-
-# Define quantum dot system
-Cdd = jnp.array([[1, 0], [0, 1]])  # 2x2 dot-dot capacitance matrix
-Cds = jnp.array([[1], [0.1]]) * 0.6  # 2x1 dot-sensor coupling matrix
-dot_system = QuantumDotSystem(Cdd, Cds)
-
-# Configure sensor
-params_resonator = {
-    'Lc': 800e-9,
-    'Cp': 0.5e-12,
-    'RL': 40,
-    'Rc': 100e6,
-    'Z0': 50
-}
-
-params_coulomb_peak = {
-    'g0': 1/50/1e6,
-    'eps0': 0.5,
-    'eps_width': 1
-}
-
-# Create noise model and sensor
-eps_noise = OverFNoise(n_fluctuators=3, S1=1e-6, sigma_couplings=0.1,
-                       ommax=1e6, ommin=1e3, equally_dist=True)
-c_noise = OU_noise(sigma=1e-12, gamma=1e5)
-sensor = RLC_sensor(params_resonator, params_coulomb_peak, c_noise, eps_noise)
-
-# Create simulator
-simulator = JAXReadoutSimulator(dot_system, [sensor])
-
-# Define simulation parameters
-t_end = 1000 * sensor.T0
-dt = 0.5e-9
-times = jnp.arange(0, t_end, dt)
-charge_states = jnp.array([[1, 0], [0, 1], [1, 1]])
-
-# Precompute noise trajectories
-key = jax.random.PRNGKey(42)
-simulator.precompute_noise(key, times, n_realizations=50, noise_model=eps_noise)
-
-# Run simulation
-params = {'SNR_white': 10, 'eps0': 0.5}
-results = simulator.run_simulation(charge_states, times, params, key)
-
-# Analyze results
-I_integrated, Q_integrated = simulator.get_integrated_IQ(sensor_idx=0)
-fidelity = simulator.calculate_fidelity(sensor_idx=0)
-print(f"Readout fidelity: {fidelity:.3f}")
+```bash
+pip install jax jaxlib          # CPU
+# pip install jax[cuda12]       # NVIDIA GPU
 ```
 
-## Architecture
+---
 
-### Core Components
+## Quick Start — Single Dot with 1/f Noise
 
-1. **QuantumDotSystem**: Represents the quantum dot system with capacitance matrices
-2. **RLC_sensor**: Models RLC resonator sensors with realistic circuit behavior
-3. **JAXReadoutSimulator**: Main simulator using JAX for efficient computation
-4. **Noise Models**: JAX-compatible noise generators (OU_noise, OverFNoise)
+```python
+import numpy as np
+import sys; sys.path.append('src')
 
-### Key Innovations
+from readout_simulator import QuantumDotSystem, RLC_sensor
+from readout_simulator.noise_models import SpectrumNoise
 
-- **Precomputed Noise**: Noise trajectories are generated once and reused across all states
-- **State Scanning**: Uses JAX scan to efficiently process multiple charge states
-- **Vectorized Operations**: All computations are vectorized for GPU acceleration
-- **Post-processing Noise**: White noise is added after signal generation for flexibility
+# --- system ---
+dot_system = QuantumDotSystem(
+    Cdd=np.array([[1.0]]),
+    Cds=np.array([[0.5]])
+)
 
-## Performance
+sensor = RLC_sensor(
+    {'Lc': 800e-9, 'Cp': 0.5e-12, 'RL': 40, 'Rc': 0, 'Z0': 50},
+    {'g0': 1/50, 'eps0': 0.5, 'eps_width': 1.0}
+)
 
-The JAX-based implementation provides significant performance improvements:
+# --- noise ---
+times = np.arange(0, 1e-6, 1e-9)                  # 1 µs, 1 ns steps
+noise = SpectrumNoise(psd_func=lambda f: np.where(f > 0, 1/f, 0) + 1, sigma=0.1)
+noise_traj = noise.generate_trajectory(times, seed=0)
 
-- **GPU acceleration** support through JAX
-- **Vectorized state processing** using JAX scan
-- **Precomputed noise trajectories** eliminate redundant calculations
-- **Efficient memory usage** through JAX's functional programming model
+# --- simulate ---
+I, Q, _, _ = sensor.get_signal(
+    times=times,
+    dot_system=dot_system,
+    charge_state=np.array([1]),
+    sensor_index=0,
+    params={'eps0': 0.0},
+    noise_trajectory=noise_traj,
+    use_stationary_initial_state=True,
+)
+print(f"I: mean={I.mean():.4f} V,  Q: mean={Q.mean():.4f} V")
+```
+
+---
+
+## Key Concept — Coulomb Peak and Noise Sensitivity
+
+The sensor conductance follows a `cosh⁻²` Coulomb peak:
+
+```
+G(ε) = (2/R₀) cosh⁻²(2ε/εw)
+```
+
+The IQ fluctuation amplitude is proportional to the **local slope** `|dG/dε|`,
+which is zero at the peak centre and maximal on the flanks.
+A charge state parked on the steep flank is therefore more noise-sensitive than
+one near the peak top — even when both states experience identical charge noise.
+This is automatically visualised in the `two_dot_iq_gif.ipynb` notebook.
+
+---
 
 ## Examples
 
-See the `examples/` directory for detailed usage examples:
+| Notebook | What it shows |
+|---|---|
+| `examples/single_dot_1f_noise.ipynb` | 10 realisations of 1/*f* noise; I and Q time traces per realisation |
+| `examples/two_dot_iq_gif.ipynb` | Two-dot system; Coulomb peak positions; animated IQ comet GIF |
 
-- `jax_example.ipynb`: Basic JAX-based simulation example
-- Additional examples demonstrating advanced features
+---
+
+## Theory and Limitations
+
+`notes/ReadSpyn_Model_Summary.pdf` documents:
+
+- The constant-interaction electrostatic model and lever-arm formula
+- The Coulomb-peak conductance model and its assumptions
+- The RLC circuit ODE and IQ demodulation scheme
+- All noise models (spectrum-prescribed, OU, telegraph)
+- A structured list of **current limitations** (quantum effects, amplifier noise,
+  thermal effects, lumped-element approximation, …)
+- A prioritised road map of planned extensions
+
+To recompile the PDF:
+
+```bash
+cd notes
+PATH=/Library/TeX/texbin:$PATH latexmk -pdf ReadSpyn_Model_Summary.tex
+```
+
+---
 
 ## Dependencies
 
-- JAX >= 0.4.0
-- NumPy >= 1.21.0
-- Matplotlib >= 3.5.0
-- SciPy >= 1.7.0
+| Package | Version |
+|---|---|
+| Python | ≥ 3.8 |
+| NumPy | ≥ 1.21 |
+| SciPy | ≥ 1.7 |
+| Matplotlib | ≥ 3.5 |
+| numba | (for JIT-compiled ODE inner loop) |
+| JAX / jaxlib | ≥ 0.4 (optional) |
 
-## Contributing
+---
 
-Contributions are welcome! Please feel free to submit pull requests or open issues.
+## Authors
+
+- **Jan A. Krzywda** — j.a.krzywda@liacs.leidenuniv.nl
+- **Rouven K. Koch** — R.K.Koch@tudelft.nl
 
 ## License
 
-This project is licensed under the MIT License.
+MIT — see `pyproject.toml`.
 
 ## Citation
 
-If you use ReadSpyn in your research, please cite:
-
 ```bibtex
-@software{readspyn2024,
-  title={ReadSpyn: JAX-based Quantum Dot Readout Simulator},
-  author={Krzywda, Jan A.},
-  year={2024},
-  url={https://github.com/jkrzywda/ReadSpyn}
+@software{readspyn2025,
+  title   = {{ReadSpyn}: RF Reflectometry Readout Simulator for Quantum Dot Systems},
+  author  = {Krzywda, Jan A. and Koch, Rouven K.},
+  year    = {2025},
+  url     = {https://github.com/jan-a-krzywda/ReadSpyn}
 }
 ```
-
-## Contact
-
-- Author: Jan A. Krzywda, Rouven K. Koch
-- Email: j.a.krzywda@liacs.leidenuniv.nl
-- GitHub: https://github.com/jkrzywda/ReadSpyn 

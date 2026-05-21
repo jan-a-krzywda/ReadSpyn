@@ -5,6 +5,7 @@ This module provides JAX-compatible noise models for simulating realistic quantu
 readout systems, including Ornstein-Uhlenbeck processes and 1/f noise.
 """
 
+import numpy as np
 try:
     import jax
     import jax.numpy as jnp
@@ -99,6 +100,86 @@ class OU_noise:
         spectrum = (2 * self.sigma**2 * self.tc) / (1 + (omega * self.tc)**2)
         
         return freqs, spectrum
+
+
+class SpectrumNoise:
+    """
+    Generate Gaussian noise with a prescribed power spectral density (PSD).
+
+    The trajectory is built in the frequency domain:
+      1. Evaluate the user-supplied PSD function on the FFT frequency grid.
+      2. Draw independent complex Gaussian amplitudes scaled by sqrt(PSD/2).
+      3. Enforce Hermitian symmetry so the inverse FFT is real.
+      4. Normalise the result so its variance equals ``sigma**2``.
+
+    This is numpy-only (no JAX required) so it works even without a GPU.
+
+    Parameters
+    ----------
+    psd_func : callable  f(freqs_Hz) -> array_like
+        Power spectral density as a function of frequency in Hz.
+        Only the *shape* of the spectrum matters; overall amplitude is
+        fixed by ``sigma``.
+    sigma : float
+        Target RMS amplitude of the trajectory in the same units as the
+        energy offset (i.e. multiples of ``eps_width``).
+        A value of ~0.3–1.0 produces clearly visible IQ modulation.
+    """
+
+    def __init__(self, psd_func, sigma: float):
+        self.psd_func = psd_func
+        self.sigma = sigma
+
+    def generate_trajectory(self, times: np.ndarray, seed: int = 0) -> np.ndarray:
+        """
+        Generate one noise realisation.
+
+        Parameters
+        ----------
+        times : np.ndarray
+            Uniformly-spaced time array (seconds).
+        seed : int
+            Random seed for reproducibility.
+
+        Returns
+        -------
+        np.ndarray  shape (len(times),)
+        """
+        rng = np.random.default_rng(seed)
+        n   = len(times)
+        dt  = times[1] - times[0]
+
+        freqs = np.fft.rfftfreq(n, d=dt)           # positive frequencies only
+        psd   = np.asarray(self.psd_func(freqs), dtype=float)
+        psd   = np.where(psd < 0, 0.0, psd)        # safety: no negative power
+        psd[0] = 0.0                                # zero DC component
+
+        # Complex amplitudes:  amplitude ∝ sqrt(PSD), random phase
+        amplitude = np.sqrt(psd / 2.0)
+        noise_fft = amplitude * (rng.standard_normal(len(freqs))
+                                 + 1j * rng.standard_normal(len(freqs)))
+
+        traj = np.fft.irfft(noise_fft, n=n)
+
+        # Normalise to target sigma
+        std = traj.std()
+        if std > 0:
+            traj = traj * (self.sigma / std)
+
+        return traj
+
+    def generate_trajectories(self, times: np.ndarray,
+                               n: int, seed: int = 0) -> np.ndarray:
+        """
+        Generate *n* independent realisations.
+
+        Returns
+        -------
+        np.ndarray  shape (n, len(times))
+        """
+        return np.stack([
+            self.generate_trajectory(times, seed=seed + k) for k in range(n)
+        ])
 
 
 class OverFNoise:

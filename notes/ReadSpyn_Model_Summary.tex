@@ -1,0 +1,375 @@
+\documentclass[11pt,a4paper]{article}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amsfonts,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{float}
+\usepackage{microtype}
+
+\geometry{margin=2.5cm}
+\hypersetup{colorlinks=true,linkcolor=blue!70!black,citecolor=green!50!black,urlcolor=blue!70!black}
+
+\title{\textbf{ReadSpyn}: A Semi-Classical Simulator for\\
+  RF Reflectometry Readout of Quantum Dot Systems\\[4pt]
+  \large Model Summary, Physical Assumptions, and\\
+  Path Towards Realistic Simulation}
+\author{Jan A.\ Krzywda \and Rouven K.\ Koch}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We present \textsc{ReadSpyn}, a time-domain simulator for RF reflectometry
+readout of semiconductor quantum dot (QD) systems.
+The simulator propagates the equations of motion of an RLC resonator
+capacitively coupled to one or more quantum dots, driven at its resonant
+frequency, and subject to charge noise.
+The reflected voltage is subsequently IQ-demodulated to yield the quadrature
+signals $I(t)$ and $Q(t)$ recorded in experiment.
+\textsc{ReadSpyn} represents a step towards realistically reproducing
+laboratory readout traces: it incorporates an experimentally motivated
+charge-noise spectrum, an analytic Coulomb-peak conductance model, and a
+self-consistent circuit ODE.
+We explicitly enumerate the physical approximations made and identify the
+extensions required to close the gap with state-of-the-art experimental
+conditions.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+%----------------------------------------------------------------------
+\section{Introduction and Motivation}
+
+Radio-frequency (RF) reflectometry is the workhorse readout technique for
+spin and charge qubits in semiconductor QD devices
+\cite{Schoelkopf1998,Ares2016,Gonzalez-Zalba2015}.
+A resonant circuit is tank-matched to a sensor QD; changes in the sensor
+conductance shift the resonator's impedance and are imprinted on the phase
+and amplitude of the reflected microwave tone.
+After IQ demodulation the two quadratures $I(t)$ and $Q(t)$ are used to
+discriminate charge states in real time.
+
+Simulating this measurement chain end-to-end is valuable because
+(i) it allows optimisation of device parameters before fabrication,
+(ii) it provides ground-truth data for benchmarking machine-learning
+classifiers, and
+(iii) it enables systematic studies of how different noise sources limit
+readout fidelity.
+
+\textsc{ReadSpyn} targets these use cases within a semi-classical framework
+that is tractable and interpretable while capturing the dominant physics.
+This document summarises the model, states the assumptions explicitly, and
+outlines the road map towards higher-fidelity simulation.
+
+%----------------------------------------------------------------------
+\section{Quantum Dot System}
+
+\subsection{Constant-Interaction Model}
+
+The electrostatics of an array of $N$ quantum dots are described within the
+constant-interaction (CI) model.
+Mutual capacitances between dots and between dots and sensors are encoded in
+the matrices $C_{dd} \in \mathbb{R}^{N\times N}$ and
+$C_{ds} \in \mathbb{R}^{N\times M}$, where $M$ is the number of sensor QDs.
+
+\subsection{Effective Detuning}
+
+Given a charge-state vector $\mathbf{n}\in\mathbb{Z}^{N}$, a sensor-gate
+voltage vector $\mathbf{V}_s\in\mathbb{R}^{M}$, and a global offset
+$\varepsilon_0$, the effective detuning of sensor $j$ is
+\begin{equation}
+  \varepsilon_j
+  = \bigl[C_{ds}^{\top}C_{dd}^{-1}\bigr]_{j}
+    \bigl(\mathbf{n} + C_{ds}\mathbf{V}_s\bigr)
+    + \varepsilon_0 \,.
+  \label{eq:detuning}
+\end{equation}
+The row vector $[C_{ds}^{\top}C_{dd}^{-1}]_j$ is the \emph{lever arm}
+projecting the charge configuration onto the detuning axis of sensor $j$.
+Different charge states $\mathbf{n}^{(A)}$ and $\mathbf{n}^{(B)}$ produce
+different detunings $\varepsilon^{(A)}_j$ and $\varepsilon^{(B)}_j$, which
+is the physical origin of the IQ contrast used for charge-state
+discrimination.
+
+%----------------------------------------------------------------------
+\section{Sensor Conductance: the Coulomb Peak}
+
+The sensor QD is operated near a Coulomb blockade resonance.
+In the sequential-tunnelling limit at low temperature the zero-bias
+conductance as a function of detuning is \cite{Beenakker1991}
+\begin{equation}
+  G(\varepsilon) = \frac{2}{R_0}
+    \cosh^{-2}\!\!\left(\frac{2\varepsilon}{\varepsilon_w}\right),
+  \label{eq:coulomb_peak}
+\end{equation}
+where $R_0=1/g_0$ is the on-resonance resistance and $\varepsilon_w$ is the
+thermal broadening width.
+The local slope
+\begin{equation}
+  \frac{dG}{d\varepsilon}
+  = -\frac{4}{R_0\,\varepsilon_w}
+    \cosh^{-2}\!\!\left(\frac{2\varepsilon}{\varepsilon_w}\right)
+    \tanh\!\left(\frac{2\varepsilon}{\varepsilon_w}\right)
+  \label{eq:dGdeps}
+\end{equation}
+is zero at the peak centre and extremal at $|\varepsilon|=\varepsilon_w/2$.
+A charge state whose static detuning \eqref{eq:detuning} lands on the steep
+flank therefore produces larger IQ fluctuations under charge noise than one
+sitting near the peak top --- even when both states experience the same noise.
+This is the mechanism behind the asymmetric noise sensitivity observed in the
+two-dot simulations.
+
+%----------------------------------------------------------------------
+\section{RLC Resonator and Circuit ODE}
+
+\subsection{Lumped-Element Circuit}
+
+The sensor QD is embedded in a lumped RLC tank circuit:
+\begin{itemize}[nosep]
+  \item Inductor $L_c$ (bond wire or on-chip spiral),
+  \item Parasitic shunt capacitance $C_p$,
+  \item Transmission-line load $R_L$ (typically $50\,\Omega$),
+  \item Optional series coupling resistor $R_c$.
+\end{itemize}
+The circuit is driven at $\omega_d\approx\omega_0=1/\sqrt{L_cC_p}$.
+
+\subsection{Equations of Motion}
+
+With state vector $\mathbf{y}=(V_{C_p},I_L)^{\top}$ the circuit obeys
+\begin{align}
+  \frac{dV_{C_p}}{dt}
+    &= \frac{I_L - G_s(t)V_{C_p}}{C_p}
+       \qquad(R_c=0), \label{eq:ode1}\\[4pt]
+  \frac{dI_L}{dt}
+    &= \frac{V_s(t) - R_LI_L - V_A}{L_c}, \label{eq:ode2}
+\end{align}
+where $V_s(t)=V_0\cos(\omega_d t)$ and $V_A=V_{C_p}$ for $R_c=0$.
+The time-dependent conductance $G_s(t)=G(\varepsilon(t))$ is obtained by
+substituting the instantaneous noisy detuning into \eqref{eq:coulomb_peak}.
+The ODEs are integrated with the stiff Radau solver
+(\texttt{scipy.integrate.solve\_ivp}); inner-loop functions are JIT-compiled
+with Numba.
+
+\subsection{IQ Demodulation}
+
+The voltage $V_A(t)$ is demodulated against the drive tone:
+\begin{align}
+  I(t) &= \mathrm{LPF}\!\left[V_A(t)\cos(\omega_d t+\phi)\right],\\
+  Q(t) &= \mathrm{LPF}\!\left[V_A(t)\sin(\omega_d t+\phi)\right],
+\end{align}
+where $\phi$ is the demodulation phase.
+In \textsc{ReadSpyn} demodulation uses the Hilbert transform; edge artefacts
+are suppressed by padding the integration window before trimming to the
+requested output interval.
+
+%----------------------------------------------------------------------
+\section{Noise Models}
+
+\subsection{Spectrum-Prescribed $1/f$ Noise}
+
+The dominant low-frequency noise in semiconductor QD devices is charge noise
+with PSD $S(f)\propto 1/f$.
+\textsc{ReadSpyn} generates noise trajectories $\delta\varepsilon(t)$ by
+drawing Gaussian random amplitudes in frequency space scaled by $\sqrt{S(f)}$
+and inverse-Fourier-transforming, then normalising to a prescribed RMS
+amplitude $\sigma$ (in units of $\varepsilon_w$).
+The same realisation can be shared across charge states (common-mode noise)
+or independent realisations can be used.
+
+\subsection{Ornstein--Uhlenbeck and Telegraph Noise}
+
+For coloured Gaussian noise with a Lorentzian PSD, an Ornstein--Uhlenbeck
+process is available:
+\begin{equation}
+  d\delta\varepsilon = -\gamma\,\delta\varepsilon\,dt
+    + \sigma\sqrt{2\gamma}\,dW, \label{eq:ou}
+\end{equation}
+with correlation time $\tau_c=1/\gamma$.
+Two-level fluctuators (bistable charge traps) are modelled as telegraph noise
+with switching rate $\gamma$.
+
+%----------------------------------------------------------------------
+\section{A Step Towards Realistic Simulation}
+
+\textsc{ReadSpyn} advances beyond a simple analytic toy model in several
+respects:
+\begin{enumerate}[label=\arabic*.]
+  \item \textbf{Self-consistent circuit dynamics.} The conductance back-action
+    on the resonator is solved via a full ODE rather than a perturbative
+    susceptibility formula.
+  \item \textbf{Time-domain noise injection.} Noise enters as a time-domain
+    trajectory, so simulated IQ traces include realistic low-frequency drift.
+  \item \textbf{User-configurable spectral shape.} The $1/f$ PSD can be matched
+    to measured charge-noise spectra.
+  \item \textbf{Multi-dot, multi-sensor geometry.} The capacitance-matrix
+    formalism supports arbitrary numbers of dots and sensors, enabling studies
+    of cross-talk and lever-arm asymmetries.
+  \item \textbf{Edge-corrected Hilbert demodulation.} Window padding suppresses
+    Hilbert-transform edge ringing, mirroring experimental DSP practice.
+  \item \textbf{Stationary initial state.} The ODE is initialised at the
+    ring-up-free steady state, avoiding transient artefacts.
+\end{enumerate}
+
+%----------------------------------------------------------------------
+\section{Limitations with Respect to Realistic Semiconductor QD Measurements}
+\label{sec:limitations}
+
+Despite the advances above, several important physical effects are absent from
+the current framework. We group them thematically below.
+
+\subsection{Quantum and Many-Body Effects}
+
+\begin{enumerate}[label=\alph*.]
+  \item \textbf{No tunnel broadening.} Eq.~\eqref{eq:coulomb_peak} is the
+    sequential-tunnelling result valid at $k_BT\gg\Gamma$. When $\Gamma\sim
+    k_BT$ the Lorentzian (co-tunnelling / Kondo) line shape is not captured.
+  \item \textbf{Classical charge states only.} Coherent charge superpositions
+    (e.g.\ spin-to-charge conversion in Pauli-spin-blockade readout) require a
+    density-matrix description.
+  \item \textbf{No spin, valley, or orbital degeneracy.} Zeeman splitting,
+    spin-orbit coupling, and valley degeneracy in Si/Ge are absent.
+  \item \textbf{Constant-interaction approximation.} Energy-dependent
+    screening and higher-order Coulomb effects are neglected.
+\end{enumerate}
+
+\subsection{Thermal and Non-Equilibrium Effects}
+
+\begin{enumerate}[label=\alph*.]
+  \item \textbf{Fixed electron temperature.} Microwave heating of the electron
+    bath (photon-assisted tunnelling) is not modelled.
+  \item \textbf{No photon-number-dependent back-action.} Above the
+    single-photon power limit the resonator photon number causes an ac-Stark
+    shift and measurement-induced dephasing, absent in the classical ODE.
+  \item \textbf{No charge-state relaxation.} The charge configuration
+    $\mathbf{n}$ is held constant during integration; qubit $T_1$ processes
+    are not simulated.
+\end{enumerate}
+
+\subsection{Circuit and Electromagnetic Effects}
+
+\begin{enumerate}[label=\alph*.]
+  \item \textbf{Lumped-element model.} Distributed transmission-line effects
+    and parasitic resonances of bond wires become important above
+    ${\sim}1$\,GHz.
+  \item \textbf{No amplifier noise.} The noise floor in experiment is
+    dominated by the cryogenic amplifier (HEMT or paramp); this is not added
+    to the simulated signal.
+  \item \textbf{Perfect impedance matching.} Reflections from mismatch between
+    the tank and the coaxial line are ignored.
+  \item \textbf{No dispersive frequency shift.} Only the dissipative part
+    $\delta G_s$ is modelled; the reactive part $\delta B_s$ that shifts the
+    resonant frequency (dispersive readout) is absent.
+\end{enumerate}
+
+\subsection{Noise Modelling}
+
+\begin{enumerate}[label=\alph*.]
+  \item \textbf{Scalar, additive, global charge noise.} The noise is a single
+    shift $\delta\varepsilon(t)$ on the sensor detuning. Per-gate voltage
+    fluctuations that perturb individual dot potentials independently are not
+    resolved.
+  \item \textbf{No spatial cross-correlations.} Correlated noise from a
+    single nearby charge trap affecting multiple dots is not included.
+  \item \textbf{No TLS noise in circuit components.} Two-level-system noise
+    in the dielectric of $C_p$ causes resistance fluctuations that are not
+    modelled.
+\end{enumerate}
+
+\subsection{Signal Processing}
+
+\begin{enumerate}[label=\alph*.]
+  \item \textbf{Ideal local oscillator.} Phase noise and frequency jitter of
+    the drive source are absent.
+  \item \textbf{Ideal brick-wall low-pass filter.} The Hilbert-transform
+    demodulation acts as a brick-wall filter; a realistic Butterworth or
+    Gaussian filter would roll off differently.
+  \item \textbf{No ADC effects.} Quantisation noise, dynamic range
+    limitations, and clock jitter are not included.
+\end{enumerate}
+
+%----------------------------------------------------------------------
+\section{Road Map}
+
+Table~\ref{tab:roadmap} summarises the most impactful extensions and their
+estimated implementation effort.
+
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{lll}
+\toprule
+Extension & Physical motivation & Effort \\
+\midrule
+Amplifier noise (HEMT / paramp)           & Sets SNR floor in all experiments       & Low    \\
+Finite electron temperature $T_e$          & Low-power / high-fidelity regime        & Low    \\
+Per-dot local gate noise                   & Realistic multi-dot operation           & Low    \\
+Charge relaxation / $T_1$ during readout   & Spin-qubit readout fidelity             & Medium \\
+Dispersive frequency shift ($\delta B_s$)  & Dispersive readout schemes              & Medium \\
+Tunnel-broadened Lorentzian line shape     & $\Gamma\sim k_BT$ regime               & Medium \\
+Density-matrix charge dynamics             & Coherent charge superpositions          & High   \\
+Distributed circuit / transmission line    & $f_0>1$\,GHz, parasitic resonances     & High   \\
+\bottomrule
+\end{tabular}
+\caption{Prioritised road map for extending \textsc{ReadSpyn}.}
+\label{tab:roadmap}
+\end{table}
+
+%----------------------------------------------------------------------
+\section{Conclusion}
+
+\textsc{ReadSpyn} provides a self-consistent, time-domain simulation of RF
+reflectometry readout of semiconductor quantum dot systems.
+By solving the circuit ODE in the presence of physically motivated charge
+noise and demodulating the output, the simulator reproduces the qualitative
+features of experimental IQ traces: state-dependent DC offsets, noise-driven
+fluctuations whose magnitude depends on the local slope \eqref{eq:dGdeps} of
+the Coulomb peak, and comet-tail trajectories in the IQ plane.
+
+The framework is a deliberate step towards realistic measurement simulation
+rather than a full first-principles model.
+Section~\ref{sec:limitations} enumerates the current approximations in order
+of physical importance.
+The most pressing gaps are the absence of amplifier noise (which sets the
+actual SNR floor) and of charge-relaxation dynamics (which limit spin-qubit
+readout fidelity).
+Addressing these two items, together with per-dot local gate noise for
+multi-dot arrays, would bring \textsc{ReadSpyn} into quantitative contact
+with state-of-the-art experimental data.
+
+%----------------------------------------------------------------------
+\begin{thebibliography}{9}
+
+\bibitem{Schoelkopf1998}
+R.~J.\ Schoelkopf \textit{et al.},
+\textit{The radio-frequency single-electron transistor (RF-SET)},
+Science \textbf{280}, 1238 (1998).
+
+\bibitem{Ares2016}
+N.\ Ares \textit{et al.},
+\textit{Sensitive radio-frequency measurements of a quantum dot by tuning to
+perfect impedance matching},
+Phys.\ Rev.\ Applied \textbf{5}, 034011 (2016).
+
+\bibitem{Gonzalez-Zalba2015}
+M.~F.\ Gonzalez-Zalba \textit{et al.},
+\textit{Probing the limits of gate-based charge sensing},
+Nature Communications \textbf{6}, 6084 (2015).
+
+\bibitem{Beenakker1991}
+C.~W.~J.\ Beenakker,
+\textit{Theory of Coulomb-blockade oscillations in the conductance of a
+quantum dot},
+Phys.\ Rev.\ B \textbf{44}, 1646 (1991).
+
+\end{thebibliography}
+
+\end{document}

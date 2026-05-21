@@ -20,7 +20,7 @@ except ImportError:
     jnp = DummyJAX()
 from scipy.integrate import solve_ivp
 from scipy.interpolate import interp1d
-from scipy.signal import hilbert
+from scipy.signal import butter, filtfilt
 from numba import njit
 from typing import Dict, Any, Optional, Tuple
 from functools import partial
@@ -264,7 +264,10 @@ class RLC_sensor:
 
     def get_signal(self, times: np.ndarray, dot_system: QuantumDotSystem,
                    charge_state: np.ndarray, sensor_index: int, params: Dict[str, Any],
-                   noise_trajectory: Optional[np.ndarray] = None) -> tuple:
+                   noise_trajectory: Optional[np.ndarray] = None,
+                   use_stationary_initial_state: bool = False,
+                   trim_edges: bool = True,
+                   edge_padding: float = 200e-9) -> tuple:
         """
         Simulate the IQ signal for a given charge state and noise trajectory.
         
@@ -289,7 +292,6 @@ class RLC_sensor:
         
         # Calculate meaningful SNR if charge states are provided
         SNR_white = params.get('SNR_white', 1.0)
-        print(SNR_white)
         if 'charge_states' in params:
             # Calculate SNR based on conductance difference between charge states
             meaningful_snr = self.calculate_meaningful_snr(dot_system, params['charge_states'], sensor_index)
@@ -299,27 +301,74 @@ class RLC_sensor:
         
         t_end = times[-1]
         
-        # Apply noise trajectory if provided
-        eps_values = (noise_trajectory if noise_trajectory is not None else 0) + energy_offset
+        # ── Tail padding ──────────────────────────────────────────────────────
+        # Append edge_padding to the end so the Hilbert transform has no edge ringing.
+        # The extra window is stripped from all outputs before returning.
+        t_tail = edge_padding if trim_edges else 0.0
+        if trim_edges:
+            dt = times[1] - times[0]
+            tail_times = np.arange(times[-1] + dt, times[-1] + t_tail + dt * 0.5, dt)
+            times_full = np.concatenate([times, tail_times])
+            n_tail = len(tail_times)
+            # Extend noise / eps for the tail window (hold last value)
+            eps_tail = np.full(n_tail, energy_offset if noise_trajectory is None
+                               else noise_trajectory[-1] + energy_offset)
+        else:
+            times_full = times
+            n_tail = 0
+        t_end_full = times_full[-1]
+        eps_values_core = (noise_trajectory if noise_trajectory is not None else 0) + energy_offset
+
+        # Build eps array over the full (possibly extended) time axis
+        if trim_edges and n_tail > 0:
+            eps_values = np.concatenate([
+                np.atleast_1d(eps_values_core) if noise_trajectory is not None
+                else np.full(len(times), energy_offset),
+                eps_tail,
+            ])
+        else:
+            eps_values = eps_values_core
 
         # Create interpolator for energy values
-        eps_interpolator = interp1d(times, eps_values, kind='cubic', 
-                                   fill_value="extrapolate", bounds_error=False)  #can we avoid interpolation?
-        
+        eps_interpolator = interp1d(times_full, eps_values, kind='cubic',
+                                    fill_value="extrapolate", bounds_error=False)
+
         # Initial conditions and effective resistance
-        y0 = [0.0, 0.0]  # [v_Cp, i_L]
         RL_effective = self.RL + self.Z0
-        
+
+        # Generate capacitance noise if model is provided
+        C_noise = np.zeros_like(times_full)
+        if self.C_noise_model:
+            for i in range(len(times)):
+                dt_i = times[i] - (times[i-1] if i > 0 else 0)
+                C_noise[i] = self.C_noise_model.update(dt_i)
+
         def v_s_source_func(t):  #TODO: input
             """Source voltage function."""
             return 1.0 * np.sin(self.omega0 * t)
 
-        # Generate capacitance noise if model is provided
-        C_noise = np.zeros_like(times)
-        if self.C_noise_model:
-            for i in range(len(times)):
-                dt = times[i] - (times[i-1] if i > 0 else 0)
-                C_noise[i] = self.C_noise_model.update(dt)
+        if not use_stationary_initial_state:
+            y0 = [0.0, 0.0]  # [v_Cp, i_L]
+            t_start = 0.0
+            t_eval = times_full
+        else:
+            # Extend the simulation backwards by t_warmup, starting from zero.
+            # The ring-up transient occurs in this prepended window and is
+            # discarded from the output, leaving only the settled signal.
+            t_warmup = edge_padding
+            dt = times[1] - times[0]
+            warmup_times = np.arange(-t_warmup, 0.0, dt)
+            t_eval = np.concatenate([warmup_times, times_full])
+            # Extend the eps / noise trajectory with the noiseless initial value
+            eps_warmup = np.full(len(warmup_times), energy_offset)
+            eps_values = np.concatenate([eps_warmup, eps_values])
+            # Rebuild interpolator over the extended time array
+            eps_interpolator = interp1d(t_eval, eps_values, kind='cubic',
+                                        fill_value="extrapolate", bounds_error=False)
+            # Extend C_noise with zeros for the warm-up window
+            C_noise = np.concatenate([np.zeros(len(warmup_times)), C_noise])
+            y0 = [0.0, 0.0]
+            t_start = t_eval[0]
 
         def ode_wrapper(t, y):
             """Wrapper for the ODE system."""
@@ -327,30 +376,63 @@ class RLC_sensor:
             v_s_val = v_s_source_func(t)
             
             # Get noisy capacitance
-            C_noisy = self.C_total + C_noise[np.argmin(np.abs(times - t))]
+            C_noisy = self.C_total + C_noise[np.argmin(np.abs(t_eval - t))]
             
             return rlc_ode_system_numba(t, y, self.Lc, C_noisy, RL_effective, 
                                        self.Rc, eps_val, v_s_val, self.eps_w, self.R0)
 
-        # Solve ODE system
-        sol = solve_ivp(ode_wrapper, [0, t_end], y0, t_eval=times, 
+        # Solve ODE system (over full extended range including tail padding)
+        sol = solve_ivp(ode_wrapper, [t_start, t_end_full], y0, t_eval=t_eval,
                        method='Radau', rtol=1e-3, atol=1e-4)
 
-        # Extract current and calculate reflected voltage
-        i_L_sim = sol.y[1, :]
-        V_s_t = v_s_source_func(sol.t)
-           
-        # Add noise based on SNR
-    
-        V_refl_t = (V_s_t - self.Z0 * i_L_sim - (V_s_t / 2.0)) 
+        # Compute V_refl and IQ over the FULL sol (including warm-up + tail) so
+        # the Hilbert transform has no edge artifact at either boundary.
+        i_L_full = sol.y[1, :]
+        V_s_full = v_s_source_func(sol.t)
+        V_refl_full = V_s_full - self.Z0 * i_L_full - (V_s_full / 2.0)
 
-        
-        
-        # Extract I and Q components using Hilbert transform
-        V_refl_phasor = hilbert(V_refl_t) * np.exp(-1j * self.omega0 * sol.t)  # why if we add noise here results are quantised?
-        I = np.real(V_refl_phasor) 
-        Q = np.imag(V_refl_phasor)
-        
+        # Demodulate over full array (including warmup + tail) using lock-in
+        # multiplication + low-pass filter.  This avoids the FFT periodicity
+        # assumption of scipy.hilbert which causes ~1/T_SIM beat-frequency
+        # artefacts even with zero noise.
+        t_arr = sol.t
+        I_raw = V_refl_full * 2.0 * np.cos(self.omega0 * t_arr)
+        Q_raw = V_refl_full * (-2.0) * np.sin(self.omega0 * t_arr)
+
+        # Low-pass filter: cutoff at f0/2 removes the 2·f0 mixing product while
+        # comfortably passing the RLC envelope bandwidth (≈ RL/2πLc).
+        dt_sol = t_arr[1] - t_arr[0]
+        fs_sol = 1.0 / dt_sol
+        fc     = self.f0 / 2.0          # cutoff well below 2·f0
+        nyq    = 0.5 * fs_sol
+        if fc < nyq:
+            b, a   = butter(4, fc / nyq, btype='low')
+            I_filt = filtfilt(b, a, I_raw)
+            Q_filt = filtfilt(b, a, Q_raw)
+        else:
+            I_filt = I_raw
+            Q_filt = Q_raw
+
+        if use_stationary_initial_state:
+            n_warmup = len(warmup_times)
+            sol_t    = sol.t[n_warmup:]
+            V_refl_t = V_refl_full[n_warmup:]
+            I_filt   = I_filt[n_warmup:]
+            Q_filt   = Q_filt[n_warmup:]
+        else:
+            sol_t    = sol.t
+            V_refl_t = V_refl_full
+
+        # Remove tail padding from the end
+        if trim_edges and n_tail > 0:
+            sol_t    = sol_t[:-n_tail]
+            V_refl_t = V_refl_t[:-n_tail]
+            I_filt   = I_filt[:-n_tail]
+            Q_filt   = Q_filt[:-n_tail]
+
+        I = I_filt
+        Q = Q_filt
+
 
         return I, Q, V_refl_t, times
     

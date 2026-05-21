@@ -1,0 +1,416 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amsfonts,amssymb}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{float}
+
+\geometry{margin=1in}
+
+\title{ReadSpyn: Quantum Dot Readout Simulator\\
+\large Theoretical Foundations and Model Assumptions}
+\author{Jan A. Krzywda, Rouven K. Koch}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This document provides a comprehensive explanation of the ReadSpyn package, a simulator for quantum dot readout systems with realistic noise models and RLC resonator sensors. We detail the theoretical foundations, physical assumptions, and mathematical models underlying the simulation framework, including quantum dot systems, RLC resonator circuits, noise processes, and signal processing techniques. Recent experimental findings confirm that conductance noise is directly visible in IQ signals, with the demodulation phase determining which component (I or Q) shows the strongest correlation with noise.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\section{Introduction}
+
+ReadSpyn is a comprehensive simulator for quantum dot readout systems that enables researchers to simulate and analyze the performance of quantum dot readout systems under various noise conditions. The package models realistic quantum dot systems with capacitive coupling, RLC resonator-based sensors, and advanced noise models including Ornstein-Uhlenbeck processes, 1/f noise, and telegraph noise.
+
+Recent experimental validation has confirmed that conductance noise in quantum dot systems is directly visible in the IQ readout signals, with correlation coefficients exceeding 0.9 between noise amplitude and signal components. This finding validates the physical models implemented in ReadSpyn and provides important insights for readout optimization.
+
+\section{Quantum Dot System Model}
+
+\subsection{Physical Description}
+
+Quantum dots are nanoscale semiconductor structures that confine electrons in all three spatial dimensions, creating discrete energy levels. In the context of quantum computing, quantum dots serve as qubits where the charge state (number of electrons) or spin state can encode quantum information.
+
+\subsection{Capacitive Coupling Model}
+
+The ReadSpyn package models quantum dot systems using a capacitive coupling approach, where the interaction between dots and sensors is described by capacitance matrices.
+
+\subsubsection{Dot-Dot Capacitance Matrix ($C_{dd}$)}
+
+The dot-dot capacitance matrix $C_{dd}$ describes the mutual capacitive coupling between quantum dots:
+
+\begin{equation}
+C_{dd} = \begin{pmatrix}
+C_{11} & C_{12} & \cdots & C_{1N} \\
+C_{21} & C_{22} & \cdots & C_{2N} \\
+\vdots & \vdots & \ddots & \vdots \\
+C_{N1} & C_{N2} & \cdots & C_{NN}
+\end{pmatrix}
+\end{equation}
+
+where $C_{ii}$ represents the self-capacitance of dot $i$ and $C_{ij}$ (for $i \neq j$) represents the mutual capacitance between dots $i$ and $j$.
+
+\subsubsection{Dot-Sensor Capacitance Matrix ($C_{ds}$)}
+
+The dot-sensor capacitance matrix $C_{ds}$ describes the coupling between quantum dots and readout sensors:
+
+\begin{equation}
+C_{ds} = \begin{pmatrix}
+C_{1s_1} & C_{1s_2} & \cdots & C_{1s_M} \\
+C_{2s_1} & C_{2s_2} & \cdots & C_{2s_M} \\
+\vdots & \vdots & \ddots & \vdots \\
+C_{Ns_1} & C_{Ns_2} & \cdots & C_{Ns_M}
+\end{pmatrix}
+\end{equation}
+
+where $C_{is_j}$ represents the capacitance between dot $i$ and sensor $j$.
+
+\subsection{Energy Calculation}
+
+The energy of each quantum dot is calculated using the inverse capacitance matrix:
+
+\begin{equation}
+E_i = \sum_{j=1}^{N} (C_{dd}^{-1})_{ij} \left( Q_j + \sum_{k=1}^{M} C_{ds,jk} V_{s_k} \right) + \epsilon_0
+\end{equation}
+
+where:
+\begin{itemize}
+\item $Q_j$ is the charge state of dot $j$
+\item $V_{s_k}$ is the voltage applied to sensor $k$
+\item $\epsilon_0$ is a common gate voltage offset
+\end{itemize}
+
+\subsection{Energy Offset for Sensors}
+
+The energy offset for each sensor, which determines the conductance through the sensor, is calculated as:
+
+\begin{equation}
+\epsilon_{sensor} = \sum_{i=1}^{N} \sum_{j=1}^{N} C_{ds,ji}^T (C_{dd}^{-1})_{ij} \left( Q_j + \sum_{k=1}^{M} C_{ds,jk} V_{s_k} \right) + \epsilon_0
+\end{equation}
+
+\section{RLC Resonator Sensor Model}
+
+\subsection{Circuit Description}
+
+The RLC resonator sensor consists of an inductor ($L_c$), parasitic capacitance ($C_p$), load resistance ($R_L$), and coupling resistance ($R_c$) connected to a quantum dot system through a conductance $G_s(t)$.
+
+\subsection{Circuit Equations}
+
+The RLC circuit is described by a system of ordinary differential equations:
+
+\begin{align}
+\frac{dV_{C_p}}{dt} &= \frac{I_L - V_{C_p} G_s(t)}{C_p(t)} \\
+\frac{dI_L}{dt} &= \frac{V_s(t) - R_L I_L - V_A}{L_c}
+\end{align}
+
+where:
+\begin{itemize}
+\item $V_{C_p}$ is the voltage across the parasitic capacitance
+\item $I_L$ is the current through the inductor
+\item $V_s(t)$ is the source voltage (typically sinusoidal)
+\item $V_A$ is the voltage at node A (junction between $R_c$ and $G_s$)
+\end{itemize}
+
+\subsection{Conductance Model}
+
+The conductance $G_s(t)$ through the quantum dot system is modeled using a Fermi-Dirac-like function:
+
+\begin{equation}
+G_s(t) = \frac{2}{\cosh^2(2\epsilon(t)/\epsilon_w)} \cdot \frac{1}{R_0}
+\end{equation}
+
+where:
+\begin{itemize}
+\item $\epsilon(t)$ is the time-dependent energy offset
+\item $\epsilon_w$ is the energy width of the Coulomb peak
+\item $R_0$ is the base resistance
+\end{itemize}
+
+\subsection{Resonant Frequency}
+
+The resonant frequency of the RLC circuit is given by:
+
+\begin{equation}
+\omega_0 = \frac{1}{\sqrt{L_c C_{total}}}
+\end{equation}
+
+where $C_{total} = C_p + C_{self}$ includes both parasitic and self-capacitances.
+
+\section{Noise Models}
+
+\subsection{Ornstein-Uhlenbeck (OU) Noise}
+
+The OU noise model implements a continuous-time Markov process with exponential autocorrelation:
+
+\begin{equation}
+dx = -\gamma x dt + \sigma \sqrt{2\gamma} dW
+\end{equation}
+
+where:
+\begin{itemize}
+\item $\gamma$ is the correlation rate (Hz)
+\item $\sigma$ is the noise amplitude
+\item $dW$ is a Wiener process increment
+\end{itemize}
+
+The autocorrelation function is:
+
+\begin{equation}
+\langle x(t) x(t+\tau) \rangle = \sigma^2 e^{-\gamma|\tau|}
+\end{equation}
+
+\subsection{1/f Noise Model}
+
+The 1/f noise is implemented using multiple fluctuators with different switching rates:
+
+\begin{equation}
+S(f) = \frac{S_1}{f}
+\end{equation}
+
+where $S_1$ is the 1/f noise amplitude. The total noise is constructed by summing contributions from individual fluctuators with log-uniformly distributed frequencies.
+
+\subsection{Telegraph Noise}
+
+Telegraph noise models two-level fluctuators that randomly switch between two states:
+
+\begin{equation}
+P(\text{switch in } \Delta t) = \frac{1}{2} - \frac{1}{2} e^{-2\gamma \Delta t}
+\end{equation}
+
+where $\gamma$ is the switching rate.
+
+\section{Signal Processing}
+
+\subsection{IQ Demodulation}
+
+The reflected signal is processed using IQ demodulation:
+
+\begin{align}
+I(t) &= V_{refl}(t) \cos(\omega_0 t + \phi) \\
+Q(t) &= V_{refl}(t) \sin(\omega_0 t + \phi)
+\end{align}
+
+where:
+\begin{itemize}
+\item $V_{refl}(t)$ is the reflected voltage signal
+\item $\omega_0$ is the resonant frequency
+\item $\phi$ is the demodulation phase
+\end{itemize}
+
+\subsection{Demodulation Phase Effects}
+
+Experimental findings have revealed that the choice of demodulation phase significantly affects which component (I or Q) shows the strongest correlation with conductance noise:
+
+\begin{itemize}
+\item \textbf{Phase 0°}: Q component shows strong correlation with conductance noise (correlation > 0.9), while I component shows weak correlation
+\item \textbf{Phase 45°}: Both I and Q components show strong correlation with conductance noise
+\item \textbf{Phase 90°}: I component shows strong correlation, Q component shows weak correlation
+\item \textbf{Phase 135°}: Both I and Q components show strong correlation
+\end{itemize}
+
+This behavior arises because conductance changes create amplitude modulation in the reflected signal, and the demodulation phase determines which component captures this amplitude modulation.
+
+\subsection{Conductance Noise Visibility}
+
+Recent experimental validation has confirmed that conductance noise is directly visible in IQ signals:
+
+\begin{itemize}
+\item \textbf{Strong Correlation}: Correlation coefficients between conductance noise and IQ components can exceed 0.9
+\item \textbf{Phase Dependence}: The strength of correlation depends on the demodulation phase
+\item \textbf{Charge State Separation}: Different charge states show different baseline conductances, leading to separation in the IQ plane
+\item \textbf{Noise-Induced Separation}: Conductance noise creates variations around these baselines, enabling charge state discrimination
+\end{itemize}
+
+\subsection{Signal-to-Noise Ratio}
+
+The meaningful SNR is calculated based on the conductance difference between charge states:
+
+\begin{equation}
+\text{SNR} = \frac{|G(\text{state}_1) - G(\text{state}_2)|}{\text{std}(G(\text{state}_1) - G(\text{state}_2))}
+\end{equation}
+
+where the standard deviation accounts for noise-induced variations in the conductance difference.
+
+\section{Experimental Validation}
+
+\subsection{Conductance Noise Visibility}
+
+Comprehensive testing has validated that conductance noise is directly visible in IQ signals:
+
+\begin{itemize}
+\item \textbf{Correlation Analysis}: Q-Noise correlation coefficients of 0.93-0.97 observed at 0° demodulation phase
+\item \textbf{Phase Dependence}: I-Noise correlation varies from -0.85 at 0° to -0.99 at 45° phase
+\item \textbf{Charge State Separation}: Clear separation between charge states observed in IQ plane
+\item \textbf{Noise Reduction Benefits}: Reducing conductance noise improves charge state separation and readout fidelity
+\end{itemize}
+
+\subsection{Noise Generation Validation}
+
+Testing revealed and resolved a critical issue in noise trajectory generation:
+
+\begin{itemize}
+\item \textbf{Original Bug}: Single long noise trajectory split into segments caused discontinuities in later realizations
+\item \textbf{Fix Implemented}: Separate noise trajectories generated for each realization using different random keys
+\item \textbf{Validation}: Discontinuity scores reduced from 0.97 to normal levels (< 0.02)
+\end{itemize}
+
+\section{Model Assumptions}
+
+\subsection{Quantum Dot Assumptions}
+
+\begin{enumerate}
+\item \textbf{Classical Charge States}: The model assumes classical charge states rather than quantum superposition states.
+\item \textbf{Capacitive Coupling}: Interactions are purely capacitive, neglecting quantum tunneling effects.
+\item \textbf{Linear Response}: The system operates in the linear response regime.
+\item \textbf{Constant Capacitances}: Capacitance matrices are assumed to be constant in time.
+\item \textbf{No Spin Effects}: The model does not include spin-related effects or spin-charge coupling.
+\end{enumerate}
+
+\subsection{RLC Circuit Assumptions}
+
+\begin{enumerate}
+\item \textbf{Lumped Element Model}: The circuit is modeled using lumped elements rather than distributed parameters.
+\item \textbf{Linear Components}: All circuit components (L, C, R) are assumed to be linear.
+\item \textbf{No Parasitic Inductance}: Parasitic inductance effects are neglected.
+\item \textbf{Constant Resonant Frequency}: The resonant frequency is assumed to be constant during readout.
+\item \textbf{Perfect Matching}: The circuit is assumed to be perfectly matched to the transmission line.
+\end{enumerate}
+
+\subsection{Noise Assumptions}
+
+\begin{enumerate}
+\item \textbf{Stationary Processes}: All noise processes are assumed to be stationary.
+\item \textbf{Gaussian Statistics}: OU noise assumes Gaussian statistics.
+\item \textbf{Independent Fluctuators}: In 1/f noise, individual fluctuators are assumed to be independent.
+\item \textbf{Markovian Processes}: OU and telegraph noise are assumed to be Markovian.
+\item \textbf{No Cross-Correlations}: Different noise sources are assumed to be uncorrelated.
+\end{enumerate}
+
+\subsection{Signal Processing Assumptions}
+
+\begin{enumerate}
+\item \textbf{Linear Demodulation}: IQ demodulation is assumed to be linear.
+\item \textbf{Perfect Phase Reference}: The demodulation assumes perfect phase reference.
+\item \textbf{No Aliasing}: Sampling is assumed to be sufficient to avoid aliasing.
+\item \textbf{Stationary Statistics}: Signal statistics are assumed to be stationary during readout.
+\item \textbf{Amplitude Modulation}: Conductance changes are assumed to create primarily amplitude modulation in the reflected signal.
+\end{enumerate}
+
+\section{Implementation Details}
+
+\subsection{Time Integration}
+
+The RLC circuit equations are solved using the Radau method from SciPy's \texttt{solve\_ivp} function, which is suitable for stiff differential equations.
+
+\subsection{Noise Generation}
+
+Noise trajectories are pre-generated for efficiency, using separate random keys for each realization to ensure proper statistical independence. The Numba JIT compiler is used to optimize performance-critical functions.
+
+\subsection{Memory Management}
+
+The simulator uses efficient data structures to minimize memory usage, especially important for long simulations with multiple sensors and charge states.
+
+\section{Limitations and Future Improvements}
+
+\subsection{Current Limitations}
+
+\begin{enumerate}
+\item \textbf{No Quantum Effects}: The model does not include quantum tunneling or quantum interference effects.
+\item \textbf{Single-Particle Picture}: The model assumes single-particle physics rather than many-body effects.
+\item \textbf{No Temperature Effects}: Temperature-dependent effects are not included.
+\item \textbf{Simplified Noise Models}: Real quantum dot systems may exhibit more complex noise characteristics.
+\item \textbf{No Feedback Effects}: The model does not include feedback from the readout on the quantum dot system.
+\item \textbf{Fixed Demodulation Phase}: The current implementation uses a fixed demodulation phase rather than adaptive phase selection.
+\end{enumerate}
+
+\subsection{Potential Improvements}
+
+\begin{enumerate}
+\item \textbf{Quantum Tunneling}: Include quantum tunneling effects in the conductance model.
+\item \textbf{Temperature Dependence}: Add temperature-dependent effects to noise models.
+\item \textbf{Many-Body Effects}: Include electron-electron interactions and correlation effects.
+\item \textbf{Advanced Noise Models}: Implement more sophisticated noise models including cross-correlations.
+\item \textbf{Feedback Effects}: Include feedback effects from readout on the quantum dot system.
+\item \textbf{Distributed Circuit Models}: Use distributed circuit models for more accurate high-frequency behavior.
+\item \textbf{Adaptive Demodulation}: Implement adaptive demodulation phase selection for optimal readout performance.
+\item \textbf{Real-time Noise Estimation}: Include real-time estimation of noise characteristics for adaptive filtering.
+\end{enumerate}
+
+\section{Conclusion}
+
+The ReadSpyn package provides a comprehensive framework for simulating quantum dot readout systems with realistic noise models and RLC resonator sensors. Recent experimental validation has confirmed that conductance noise is directly visible in IQ signals, with correlation coefficients exceeding 0.9 between noise amplitude and signal components.
+
+The modular design of the package allows for easy extension and modification, making it suitable for both educational purposes and research applications. The experimental findings validate the physical models implemented in ReadSpyn and provide important insights for readout optimization, particularly regarding the choice of demodulation phase and the relationship between conductance noise and signal components.
+
+Future improvements can address the limitations identified in this document, leading to more accurate and comprehensive simulations of quantum dot readout systems.
+
+\appendix
+
+\section{Parameter Ranges}
+
+Typical parameter ranges used in ReadSpyn simulations:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{llll}
+\toprule
+Parameter & Symbol & Typical Range & Units \\
+\midrule
+Inductance & $L_c$ & $10^{-9}$ - $10^{-6}$ & H \\
+Capacitance & $C_p$ & $10^{-15}$ - $10^{-12}$ & F \\
+Load Resistance & $R_L$ & $10$ - $100$ & $\Omega$ \\
+Coupling Resistance & $R_c$ & $10^6$ - $10^8$ & $\Omega$ \\
+Energy Width & $\epsilon_w$ & $10^{-4}$ - $10^{-3}$ & eV \\
+Base Resistance & $R_0$ & $10^4$ - $10^6$ & $\Omega$ \\
+Resonant Frequency & $f_0$ & $10^6$ - $10^9$ & Hz \\
+\bottomrule
+\end{tabular}
+\caption{Typical parameter ranges for RLC resonator sensors}
+\end{table}
+
+\section{Noise Parameters}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{llll}
+\toprule
+Noise Type & Parameter & Typical Range & Units \\
+\midrule
+OU Noise & $\sigma$ & $10^{-15}$ - $10^{-12}$ & eV \\
+OU Noise & $\gamma$ & $10^3$ - $10^6$ & Hz \\
+1/f Noise & $S_1$ & $10^{-6}$ - $10^{-3}$ & eV$^2$/Hz \\
+Telegraph & $\sigma$ & $10^{-12}$ - $10^{-9}$ & eV \\
+Telegraph & $\gamma$ & $10^4$ - $10^7$ & Hz \\
+\bottomrule
+\end{tabular}
+\caption{Typical noise parameter ranges}
+\end{table}
+
+\section{Experimental Validation Results}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{llll}
+\toprule
+Demodulation Phase & I-Noise Correlation & Q-Noise Correlation & Notes \\
+\midrule
+0° & -0.85 to -0.68 & 0.93 to 0.97 & Q component dominant \\
+45° & -0.99 to -0.91 & -0.99 to -0.91 & Both components strong \\
+90° & -0.99 to -0.91 & -0.87 to -0.74 & I component dominant \\
+135° & -0.99 to -0.91 & -0.99 to -0.91 & Both components strong \\
+\bottomrule
+\end{tabular}
+\caption{Experimental correlation coefficients between noise and IQ components}
+\end{table}
+
+\end{document} 
