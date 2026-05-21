@@ -14,9 +14,6 @@ It solves the RLC resonator circuit ODE in the presence of realistic charge
 noise and produces IQ-demodulated quadrature traces that closely resemble
 experimental time series.
 
-> **Theory & assumptions** — see [`notes/ReadSpyn_Model_Summary.pdf`](notes/ReadSpyn_Model_Summary.pdf)
-> (or the LaTeX source [`notes/ReadSpyn_Model_Summary.tex`](notes/ReadSpyn_Model_Summary.tex)).
-
 ---
 
 ## Features
@@ -148,7 +145,6 @@ This is automatically visualised in the `two_dot_iq_gif.ipynb` notebook.
 
 ## Theory and Limitations
 
-`notes/ReadSpyn_Model_Summary.pdf` documents:
 
 - The constant-interaction electrostatic model and lever-arm formula
 - The Coulomb-peak conductance model and its assumptions
@@ -158,12 +154,6 @@ This is automatically visualised in the `two_dot_iq_gif.ipynb` notebook.
   thermal effects, lumped-element approximation, …)
 - A prioritised road map of planned extensions
 
-To recompile the PDF:
-
-```bash
-cd notes
-PATH=/Library/TeX/texbin:$PATH latexmk -pdf ReadSpyn_Model_Summary.tex
-```
 
 ---
 
