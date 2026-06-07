@@ -34,6 +34,12 @@ experimental time series.
 
 ```
 ReadSpyn/
+├── tutorials/
+│   ├── README.md                  
+│   ├── 01_first_readout_and_iq.ipynb
+│   ├── 02_qubit_layout_and_couplings.ipynb
+│   └── 03_noise_integration_and_dataset.ipynb
+│
 ├── src/
 │   └── readout_simulator/
 │       ├── __init__.py            # public API: QuantumDotSystem, RLC_sensor
@@ -138,7 +144,12 @@ This is automatically visualised in the `two_dot_iq_gif.ipynb` notebook.
 
 | Notebook | What it shows |
 |---|---|
+| `tutorials/01_first_readout_and_iq.ipynb` | Minimal first readout: one dot, one sensor, raw and demodulated IQ traces |
+| `tutorials/02_qubit_layout_and_couplings.ipynb` | Geometry-driven tutorial with polished qubit/sensor layout and coupling visualisations |
+| `tutorials/03_noise_integration_and_dataset.ipynb` | Publication-style walkthrough from shared noise to integrated IQ clouds and saved datasets |
+| `tutorials/04_two_sensor_multi_qubit_readout.ipynb` | Two-sensor, multi-qubit readout tutorial with shared noise and sensor-specific IQ responses |
 | `examples/single_dot_1f_noise.ipynb` | 10 realisations of 1/*f* noise; I and Q time traces per realisation |
+| `examples/two_sensor_1f_dataset.ipynb` | Two-sensor dataset generation with shared 1/*f* noise; integrated IQ points saved across multiple integration times |
 | `examples/two_dot_iq_gif.ipynb` | Two-dot system; Coulomb peak positions; animated IQ comet GIF |
 
 ---
@@ -173,7 +184,7 @@ This is automatically visualised in the `two_dot_iq_gif.ipynb` notebook.
 ## Authors
 
 - **Jan A. Krzywda** — j.a.krzywda@liacs.leidenuniv.nl
-- **Rouven K. Koch** — R.K.Koch@tudelft.nl
+- **Rouven Koch** — r.k.koch@tudelft.nl
 
 ## License
 
@@ -184,7 +195,7 @@ MIT — see `pyproject.toml`.
 ```bibtex
 @software{readspyn2025,
   title   = {{ReadSpyn}: RF Reflectometry Readout Simulator for Quantum Dot Systems},
-  author  = {Krzywda, Jan A. and Koch, Rouven K.},
+  author  = {Krzywda, Jan A. and Koch, Rouven},
   year    = {2025},
   url     = {https://github.com/jan-a-krzywda/ReadSpyn}
 }

@@ -19,7 +19,6 @@ except ImportError:
     jax = DummyJAX()
     jnp = DummyJAX()
 from scipy.integrate import solve_ivp
-from scipy.interpolate import interp1d
 from scipy.signal import butter, filtfilt
 from numba import njit
 from typing import Dict, Any, Optional, Tuple
@@ -329,10 +328,6 @@ class RLC_sensor:
         else:
             eps_values = eps_values_core
 
-        # Create interpolator for energy values
-        eps_interpolator = interp1d(times_full, eps_values, kind='cubic',
-                                    fill_value="extrapolate", bounds_error=False)
-
         # Initial conditions and effective resistance
         RL_effective = self.RL + self.Z0
 
@@ -362,21 +357,28 @@ class RLC_sensor:
             # Extend the eps / noise trajectory with the noiseless initial value
             eps_warmup = np.full(len(warmup_times), energy_offset)
             eps_values = np.concatenate([eps_warmup, eps_values])
-            # Rebuild interpolator over the extended time array
-            eps_interpolator = interp1d(t_eval, eps_values, kind='cubic',
-                                        fill_value="extrapolate", bounds_error=False)
             # Extend C_noise with zeros for the warm-up window
             C_noise = np.concatenate([np.zeros(len(warmup_times)), C_noise])
             y0 = [0.0, 0.0]
             t_start = t_eval[0]
 
+        # Fast path helpers for the ODE callback. The solver evaluates the RHS
+        # many times, so we avoid per-call object dispatch and O(N) searches.
+        has_c_noise = self.C_noise_model is not None
+        t_eval_start = t_eval[0]
+        t_eval_dt = t_eval[1] - t_eval[0]
+        c_noise_size = len(C_noise)
+
         def ode_wrapper(t, y):
             """Wrapper for the ODE system."""
-            eps_val = eps_interpolator(t)
+            eps_val = np.interp(t, t_eval, eps_values)
             v_s_val = v_s_source_func(t)
             
-            # Get noisy capacitance
-            C_noisy = self.C_total + C_noise[np.argmin(np.abs(t_eval - t))]
+            if has_c_noise:
+                idx = int(np.clip(np.rint((t - t_eval_start) / t_eval_dt), 0, c_noise_size - 1))
+                C_noisy = self.C_total + C_noise[idx]
+            else:
+                C_noisy = self.C_total
             
             return rlc_ode_system_numba(t, y, self.Lc, C_noisy, RL_effective, 
                                        self.Rc, eps_val, v_s_val, self.eps_w, self.R0)

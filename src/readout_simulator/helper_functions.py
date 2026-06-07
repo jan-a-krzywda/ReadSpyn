@@ -225,17 +225,18 @@ def plot_qubit_array(dot_positions, sensor_positions, ax=None):
     for i, pos in enumerate(sensor_positions):
         ax.text(pos[0]+5, pos[1]+5, f'S{i}', fontsize=10, color='blue')
 
-    ax.axis('equal')
-
-    # Add a margin so the border looks wider in both x and y
-    x_min, x_max = dot_positions[:,0].min(), dot_positions[:,0].max()
-    y_min, y_max = dot_positions[:,1].min(), dot_positions[:,1].max()
+    # Add a margin based on both dots and sensors so asymmetric layouts
+    # (for example one sensor above and one below) are fully visible.
+    all_positions = np.vstack([dot_positions, sensor_positions])
+    x_min, x_max = all_positions[:, 0].min(), all_positions[:, 0].max()
+    y_min, y_max = all_positions[:, 1].min(), all_positions[:, 1].max()
 
     margin_x = 0.2 * (x_max - x_min) if x_max > x_min else 20
     margin_y = 0.2 * (y_max - y_min) if y_max > y_min else 20
 
     ax.set_xlim(x_min - margin_x, x_max + margin_x)
     ax.set_ylim(y_min - margin_y, y_max + margin_y)
+    ax.set_aspect('equal', adjustable='box')
 
     # Clean look: no ticks/labels, keep frame
     ax.set_xticks([]); ax.set_yticks([])
@@ -265,17 +266,18 @@ def plot_qubit_array_insert(dot_positions, sensor_positions, ax=None):
     ax.scatter(sensor_positions[:, 0], sensor_positions[:, 1], 
                c='blue', s=80, marker='s', label='Sensors')
 
-    ax.axis('equal')
-
-    # Add a margin so the border looks wider in both x and y
-    x_min, x_max = dot_positions[:,0].min(), dot_positions[:,0].max()
-    y_min, y_max = dot_positions[:,1].min(), dot_positions[:,1].max()
+    # Add a margin based on both dots and sensors so inset layouts stay centered
+    # even when sensors extend beyond the dot array.
+    all_positions = np.vstack([dot_positions, sensor_positions])
+    x_min, x_max = all_positions[:, 0].min(), all_positions[:, 0].max()
+    y_min, y_max = all_positions[:, 1].min(), all_positions[:, 1].max()
 
     margin_x = 0.2 * (x_max - x_min) if x_max > x_min else 20
     margin_y = 0.2 * (y_max - y_min) if y_max > y_min else 20
 
     ax.set_xlim(x_min - margin_x, x_max + margin_x)
     ax.set_ylim(y_min - margin_y, y_max + margin_y)
+    ax.set_aspect('equal', adjustable='box')
 
     # Clean look: no ticks/labels, keep frame
     ax.set_xticks([]); ax.set_yticks([])
@@ -288,6 +290,186 @@ def plot_qubit_array_insert(dot_positions, sensor_positions, ax=None):
         spine.set_edgecolor("black")
 
     ax.set_facecolor("white")
+
+
+def plot_qubit_layout_variants(layout_variants, C0=1.0, alpha=1.0, beta=0.1,
+                               figsize=None, figure_title='Layout variants',
+                               ncols=None):
+    """
+    Plot several dot/sensor layouts and return simple coupling summaries.
+
+    Parameters
+    ----------
+    layout_variants : dict
+        Mapping ``name -> {'dots': np.ndarray, 'sensors': np.ndarray}``.
+    C0, alpha, beta : float
+        Geometric capacitance-model parameters passed to
+        ``GeometricQuantumDotSystem``.
+    figsize : tuple or None
+        Matplotlib figure size. If omitted, a size is chosen automatically
+        from the number of layout panels.
+    figure_title : str
+        Figure title.
+    ncols : int or None
+        Number of subplot columns. If omitted, a compact grid is chosen
+        automatically.
+
+    Returns
+    -------
+    fig, axes, summary_rows
+        ``summary_rows`` contains tuples of
+        ``(name, avg_dot_dot_coupling, avg_dot_sensor_coupling, max_coupling)``.
+    """
+    from .quantum_dot_system import GeometricQuantumDotSystem
+
+    n_layouts = len(layout_variants)
+    if n_layouts == 0:
+        raise ValueError("layout_variants must contain at least one layout.")
+
+    if ncols is None:
+        ncols = min(3, n_layouts)
+    ncols = max(1, min(ncols, n_layouts))
+    nrows = int(np.ceil(n_layouts / ncols))
+
+    if figsize is None:
+        figsize = (4.0 * ncols, 4.0 * nrows)
+
+    fig, axes = plt.subplots(nrows, ncols, figsize=figsize, constrained_layout=True)
+    fig.patch.set_facecolor('#f7f7fb')
+    axes_array = np.atleast_1d(axes).ravel()
+
+    all_positions = [
+        np.vstack([np.asarray(layout['dots']), np.asarray(layout['sensors'])])
+        for layout in layout_variants.values()
+    ]
+    global_x_min = min(pos[:, 0].min() for pos in all_positions)
+    global_x_max = max(pos[:, 0].max() for pos in all_positions)
+    global_y_min = min(pos[:, 1].min() for pos in all_positions)
+    global_y_max = max(pos[:, 1].max() for pos in all_positions)
+
+    x_span = global_x_max - global_x_min
+    y_span = global_y_max - global_y_min
+    margin_x = 0.2 * x_span if x_span > 0 else 20
+    margin_y = 0.2 * y_span if y_span > 0 else 20
+
+    summary_rows = []
+
+    for ax, (name, layout) in zip(axes_array, layout_variants.items()):
+        variant = GeometricQuantumDotSystem(
+            layout['dots'],
+            layout['sensors'],
+            C0=C0,
+            alpha=alpha,
+            beta=beta,
+        )
+        plot_qubit_array(layout['dots'], layout['sensors'], ax=ax)
+        ax.set_xlim(global_x_min - margin_x, global_x_max + margin_x)
+        ax.set_ylim(global_y_min - margin_y, global_y_max + margin_y)
+        ax.set_aspect('equal', adjustable='box')
+        ax.set_title(name, fontsize=11, pad=8)
+        info = variant.get_coupling_info()
+        summary_rows.append(
+            (name, info['avg_dot_dot_coupling'], info['avg_dot_sensor_coupling'], info['max_coupling'])
+        )
+
+    for ax in axes_array[n_layouts:]:
+        ax.set_visible(False)
+
+    fig.suptitle(figure_title, fontsize=14, y=1.03)
+    return fig, axes, summary_rows
+
+
+def plot_geometry_coupling_summary(geo_system, dot_positions=None, sensor_positions=None,
+                                   figsize=(12.8, 4.9),
+                                   title='Geometry-driven quantum-dot couplings'):
+    """
+    Plot a geometric layout next to |Cdd| and |Cds| heatmaps.
+
+    Parameters
+    ----------
+    geo_system : GeometricQuantumDotSystem
+        Geometry-based system containing ``Cdd`` and ``Cds``.
+    dot_positions, sensor_positions : np.ndarray or None
+        Optional explicit positions. If omitted, positions are taken from
+        ``geo_system``.
+    figsize : tuple
+        Figure size.
+    title : str
+        Figure title.
+
+    Returns
+    -------
+    fig, (ax_layout, ax_cdd, ax_cds)
+    """
+    if dot_positions is None:
+        dot_positions = geo_system.dot_positions
+    if sensor_positions is None:
+        sensor_positions = geo_system.sensor_positions
+
+    fig = plt.figure(figsize=figsize, constrained_layout=True)
+    fig.patch.set_facecolor('#f7f7fb')
+    gs = fig.add_gridspec(1, 3, width_ratios=[1.45, 1.0, 0.9])
+
+    ax_layout = fig.add_subplot(gs[0, 0])
+    plot_qubit_array(dot_positions, sensor_positions, ax=ax_layout)
+    ax_layout.set_title('Qubit and sensor layout', fontsize=12, pad=10)
+
+    cdd_offdiag = np.abs(geo_system.Cdd[np.triu_indices(len(dot_positions), 1)])
+    cdd_scale = np.max(cdd_offdiag) if np.any(cdd_offdiag) else 1.0
+    cds_scale = np.max(np.abs(geo_system.Cds)) if np.any(geo_system.Cds) else 1.0
+
+    for i in range(len(dot_positions)):
+        for j in range(i + 1, len(dot_positions)):
+            strength = abs(geo_system.Cdd[i, j])
+            ax_layout.plot(
+                [dot_positions[i, 0], dot_positions[j, 0]],
+                [dot_positions[i, 1], dot_positions[j, 1]],
+                color='#DC2626',
+                lw=1.0 + 2.3 * strength / cdd_scale,
+                alpha=0.38,
+                zorder=1,
+            )
+
+    for i in range(len(dot_positions)):
+        for j in range(len(sensor_positions)):
+            strength = abs(geo_system.Cds[i, j])
+            ax_layout.plot(
+                [dot_positions[i, 0], sensor_positions[j, 0]],
+                [dot_positions[i, 1], sensor_positions[j, 1]],
+                color='#2563EB',
+                lw=1.0 + 2.5 * strength / cds_scale,
+                alpha=0.34,
+                zorder=1,
+            )
+
+    ax_cdd = fig.add_subplot(gs[0, 1])
+    im1 = ax_cdd.imshow(np.abs(geo_system.Cdd), cmap='Reds')
+    ax_cdd.set_title('|Cdd|', fontsize=12, pad=10)
+    ax_cdd.set_xticks(range(geo_system.num_dots))
+    ax_cdd.set_yticks(range(geo_system.num_dots))
+    ax_cdd.set_xticklabels([f'D{i}' for i in range(geo_system.num_dots)])
+    ax_cdd.set_yticklabels([f'D{i}' for i in range(geo_system.num_dots)])
+    for i in range(geo_system.num_dots):
+        for j in range(geo_system.num_dots):
+            ax_cdd.text(j, i, f'{abs(geo_system.Cdd[i, j]):.2f}',
+                        ha='center', va='center', fontsize=9, color='#111827')
+    fig.colorbar(im1, ax=ax_cdd, fraction=0.046, pad=0.04)
+
+    ax_cds = fig.add_subplot(gs[0, 2])
+    im2 = ax_cds.imshow(np.abs(geo_system.Cds), cmap='Blues')
+    ax_cds.set_title('|Cds|', fontsize=12, pad=10)
+    ax_cds.set_xticks(range(geo_system.num_sensors))
+    ax_cds.set_yticks(range(geo_system.num_dots))
+    ax_cds.set_xticklabels([f'S{i}' for i in range(geo_system.num_sensors)])
+    ax_cds.set_yticklabels([f'D{i}' for i in range(geo_system.num_dots)])
+    for i in range(geo_system.num_dots):
+        for j in range(geo_system.num_sensors):
+            ax_cds.text(j, i, f'{abs(geo_system.Cds[i, j]):.2f}',
+                        ha='center', va='center', fontsize=9, color='#111827')
+    fig.colorbar(im2, ax=ax_cds, fraction=0.06, pad=0.04)
+
+    fig.suptitle(title, fontsize=15, y=1.03)
+    return fig, (ax_layout, ax_cdd, ax_cds)
 
 
 
