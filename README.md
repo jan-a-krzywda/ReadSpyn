@@ -38,7 +38,8 @@ ReadSpyn/
 │   ├── README.md                  
 │   ├── 01_first_readout_and_iq.ipynb
 │   ├── 02_qubit_layout_and_couplings.ipynb
-│   └── 03_noise_integration_and_dataset.ipynb
+│   ├── 03_noise_integration_and_dataset.ipynb
+│   └── 04_two_sensor_multi_qubit_readout.ipynb
 │
 ├── src/
 │   └── readout_simulator/
@@ -140,14 +141,14 @@ This is automatically visualised in the `two_dot_iq_gif.ipynb` notebook.
 
 ---
 
-## Examples
+## Tutorials and Examples
 
 | Notebook | What it shows |
 |---|---|
-| `tutorials/01_first_readout_and_iq.ipynb` | Minimal first readout: one dot, one sensor, raw and demodulated IQ traces |
-| `tutorials/02_qubit_layout_and_couplings.ipynb` | Geometry-driven tutorial with polished qubit/sensor layout and coupling visualisations |
-| `tutorials/03_noise_integration_and_dataset.ipynb` | Publication-style walkthrough from shared noise to integrated IQ clouds and saved datasets |
-| `tutorials/04_two_sensor_multi_qubit_readout.ipynb` | Two-sensor, multi-qubit readout tutorial with shared noise and sensor-specific IQ responses |
+| `tutorials/01_first_readout_and_iq.ipynb` | First end-to-end tutorial: one dot, one sensor, conductance peak, noiseless readout, and noisy `I/Q` traces |
+| `tutorials/02_qubit_layout_and_couplings.ipynb` | Geometry and coupling tutorial: dot/sensor layouts, `Cdd` / `Cds`, and geometry-driven state sensitivity |
+| `tutorials/03_noise_integration_and_dataset.ipynb` | Noise-to-dataset tutorial: shared `1/f` noise, integration-time sampling, and integrated IQ cloud generation |
+| `tutorials/04_two_sensor_multi_qubit_readout.ipynb` | Multi-sensor tutorial: two sensors, multi-qubit charge states, shared noise, and sensor-specific `I/Q` responses |
 | `examples/single_dot_1f_noise.ipynb` | 10 realisations of 1/*f* noise; I and Q time traces per realisation |
 | `examples/two_sensor_1f_dataset.ipynb` | Two-sensor dataset generation with shared 1/*f* noise; integrated IQ points saved across multiple integration times |
 | `examples/two_dot_iq_gif.ipynb` | Two-dot system; Coulomb peak positions; animated IQ comet GIF |
