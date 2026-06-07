@@ -150,7 +150,6 @@ This is automatically visualised in the `two_dot_iq_gif.ipynb` notebook.
 | `tutorials/03_noise_integration_and_dataset.ipynb` | Noise-to-dataset tutorial: shared `1/f` noise, integration-time sampling, and integrated IQ cloud generation |
 | `tutorials/04_two_sensor_multi_qubit_readout.ipynb` | Multi-sensor tutorial: two sensors, multi-qubit charge states, shared noise, and sensor-specific `I/Q` responses |
 | `examples/single_dot_1f_noise.ipynb` | 10 realisations of 1/*f* noise; I and Q time traces per realisation |
-| `examples/two_sensor_1f_dataset.ipynb` | Two-sensor dataset generation with shared 1/*f* noise; integrated IQ points saved across multiple integration times |
 | `examples/two_dot_iq_gif.ipynb` | Two-dot system; Coulomb peak positions; animated IQ comet GIF |
 
 ---
