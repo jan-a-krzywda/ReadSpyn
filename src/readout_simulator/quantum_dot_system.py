@@ -8,6 +8,7 @@ dots with capacitive coupling and sensor interactions.
 import numpy as np
 from typing import Optional, Tuple, List, Union
 import matplotlib.pyplot as plt
+from scipy.optimize import least_squares
 
 
 class GeometricQuantumDotSystem:
@@ -206,6 +207,145 @@ class GeometricQuantumDotSystem:
                 f"  Min coupling strength: {coupling_info['min_coupling']:.3f}")
 
 
+def capacitance_matrices_to_geometry(Cdd: np.ndarray,
+                                     Cds: np.ndarray,
+                                     C0: Optional[float] = None,
+                                     alpha: float = 1.0,
+                                     beta: float = 0.1,
+                                     dimensions: int = 2,
+                                     random_seed: int = 0,
+                                     fit_sensors: bool = True) -> dict:
+    """
+    Infer one plausible dot/sensor layout from capacitance matrices.
+
+    This inverts the exponential distance model used by
+    ``GeometricQuantumDotSystem``:
+
+    ``|C_ij| = alpha * C0 * exp(-beta * distance_ij)``.
+
+    The inverse is not unique because rotations, translations, mirror images,
+    and imperfect/non-geometric capacitance matrices can produce equivalent or
+    approximate layouts. The returned coordinates are therefore a convenient
+    visualization and initialization, not a unique device reconstruction.
+
+    Args:
+        Cdd: Dot-dot capacitance matrix with dot self-capacitance on the diagonal.
+        Cds: Dot-sensor capacitance matrix.
+        C0: Base capacitance scale. If omitted, the mean diagonal of ``Cdd`` is used.
+        alpha: Coupling strength used by the forward geometric model.
+        beta: Distance decay used by the forward geometric model.
+        dimensions: Number of spatial dimensions to infer, 2 or 3.
+        random_seed: Seed used only for sensor-position initialization.
+        fit_sensors: If True, refine sensor positions by least squares.
+
+    Returns:
+        Dictionary with ``dot_positions``, ``sensor_positions``,
+        ``dot_distance_targets``, ``dot_sensor_distance_targets``,
+        ``reconstructed_system``, and relative reconstruction errors.
+    """
+    Cdd = np.asarray(Cdd, dtype=float)
+    Cds = np.asarray(Cds, dtype=float)
+
+    if Cdd.ndim != 2 or Cdd.shape[0] != Cdd.shape[1]:
+        raise ValueError(f"Cdd must be square, got shape {Cdd.shape}.")
+    if Cds.ndim != 2 or Cds.shape[0] != Cdd.shape[0]:
+        raise ValueError(
+            f"Cds must have shape (num_dots, num_sensors), got {Cds.shape} "
+            f"for Cdd shape {Cdd.shape}."
+        )
+    if dimensions not in (2, 3):
+        raise ValueError("dimensions must be 2 or 3.")
+    if alpha <= 0 or beta <= 0:
+        raise ValueError("alpha and beta must be positive.")
+
+    num_dots = Cdd.shape[0]
+    num_sensors = Cds.shape[1]
+    if C0 is None:
+        C0 = float(np.mean(np.abs(np.diag(Cdd))))
+    if C0 <= 0:
+        raise ValueError("C0 must be positive or inferable from the Cdd diagonal.")
+
+    max_coupling = alpha * C0
+    tiny = np.finfo(float).tiny
+
+    def coupling_to_distance(coupling):
+        magnitude = np.clip(np.abs(coupling), tiny, max_coupling)
+        return -np.log(magnitude / max_coupling) / beta
+
+    dot_distances = np.zeros((num_dots, num_dots), dtype=float)
+    for i in range(num_dots):
+        for j in range(i + 1, num_dots):
+            distance = coupling_to_distance(Cdd[i, j])
+            dot_distances[i, j] = distance
+            dot_distances[j, i] = distance
+
+    # Classical metric MDS for the dot coordinates.
+    if num_dots == 1:
+        dot_positions = np.zeros((1, dimensions), dtype=float)
+    else:
+        squared = dot_distances ** 2
+        centering = np.eye(num_dots) - np.ones((num_dots, num_dots)) / num_dots
+        gram = -0.5 * centering @ squared @ centering
+        eigvals, eigvecs = np.linalg.eigh(gram)
+        order = np.argsort(eigvals)[::-1]
+        eigvals = eigvals[order]
+        eigvecs = eigvecs[:, order]
+        positive = np.maximum(eigvals[:dimensions], 0.0)
+        dot_positions = eigvecs[:, :dimensions] * np.sqrt(positive)
+        if dot_positions.shape[1] < dimensions:
+            padding = np.zeros((num_dots, dimensions - dot_positions.shape[1]))
+            dot_positions = np.hstack([dot_positions, padding])
+
+    dot_sensor_distances = coupling_to_distance(Cds)
+    rng = np.random.default_rng(random_seed)
+    sensor_positions = np.zeros((num_sensors, dimensions), dtype=float)
+
+    dot_center = np.mean(dot_positions, axis=0)
+    dot_span = np.ptp(dot_positions, axis=0)
+    fallback_radius = max(float(np.max(dot_span)), 1.0)
+
+    for sensor_idx in range(num_sensors):
+        target = dot_sensor_distances[:, sensor_idx]
+
+        def residual(position):
+            return np.linalg.norm(dot_positions - position, axis=1) - target
+
+        if num_dots == 1:
+            start = dot_center.copy()
+            start[0] += target[0]
+        else:
+            direction = rng.normal(size=dimensions)
+            direction /= np.linalg.norm(direction)
+            start = dot_center + direction * max(float(np.mean(target)), fallback_radius)
+
+        if fit_sensors:
+            result = least_squares(residual, start)
+            sensor_positions[sensor_idx] = result.x
+        else:
+            sensor_positions[sensor_idx] = start
+
+    reconstructed_system = GeometricQuantumDotSystem(
+        dot_positions=dot_positions,
+        sensor_positions=sensor_positions,
+        C0=C0,
+        alpha=alpha,
+        beta=beta,
+    )
+
+    cdd_norm = np.linalg.norm(np.abs(Cdd)) or 1.0
+    cds_norm = np.linalg.norm(np.abs(Cds)) or 1.0
+
+    return {
+        "dot_positions": dot_positions,
+        "sensor_positions": sensor_positions,
+        "dot_distance_targets": dot_distances,
+        "dot_sensor_distance_targets": dot_sensor_distances,
+        "reconstructed_system": reconstructed_system,
+        "relative_Cdd_error": np.linalg.norm(np.abs(reconstructed_system.Cdd) - np.abs(Cdd)) / cdd_norm,
+        "relative_Cds_error": np.linalg.norm(np.abs(reconstructed_system.Cds) - np.abs(Cds)) / cds_norm,
+    }
+
+
 class QuantumDotSystem:
     """
     Manages a system of quantum dots with a constant interaction model.
@@ -220,13 +360,14 @@ class QuantumDotSystem:
         Cds (np.ndarray): Dot-sensor capacitance matrix
     """
     
-    def __init__(self, Cdd: np.ndarray, Cds: np.ndarray):
+    def __init__(self, Cdd: np.ndarray, Cds: np.ndarray, verbose: bool = False):
         """
         Initialize the quantum dot system.
         
         Args:
             Cdd: Dot-dot capacitance matrix (Ndots × Ndots)
             Cds: Dot-sensor capacitance matrix (Ndots × Nsensors)
+            verbose: Whether to print derived coupling information
             
         Raises:
             ValueError: If matrix dimensions are inconsistent
@@ -240,9 +381,9 @@ class QuantumDotSystem:
         self.Cdd_inv = np.linalg.inv(Cdd)
         self.Cds = Cds
         
-        # Print coupling information
-        coupling_strength = Cds.T @ self.Cdd_inv
-        print(f"Dot-sensor coupling strength (Δε/ε_w): {coupling_strength}")
+        if verbose:
+            coupling_strength = Cds.T @ self.Cdd_inv
+            print(f"Dot-sensor coupling strength (Δε/ε_w): {coupling_strength}")
 
     @classmethod
     def from_random(cls, num_dots: int, num_sensors: int, 

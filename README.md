@@ -32,6 +32,13 @@ experimental time series.
 
 ```
 ReadSpyn/
+├── tutorials/
+│   ├── README.md                  
+│   ├── 01_first_readout_and_iq.ipynb
+│   ├── 02_qubit_layout_and_couplings.ipynb
+│   ├── 03_noise_integration_and_dataset.ipynb
+│   └── 04_two_sensor_multi_qubit_readout.ipynb
+│
 ├── src/
 │   └── readout_simulator/
 │       ├── __init__.py            # public API: QuantumDotSystem, RLC_sensor
@@ -131,10 +138,14 @@ This is automatically visualised in the `two_dot_iq_gif.ipynb` notebook.
 
 ---
 
-## Examples
+## Tutorials and Examples
 
 | Notebook | What it shows |
 |---|---|
+| `tutorials/01_first_readout_and_iq.ipynb` | First end-to-end tutorial: one dot, one sensor, conductance peak, noiseless readout, and noisy `I/Q` traces |
+| `tutorials/02_qubit_layout_and_couplings.ipynb` | Geometry and coupling tutorial: dot/sensor layouts, `Cdd` / `Cds`, and geometry-driven state sensitivity |
+| `tutorials/03_noise_integration_and_dataset.ipynb` | Noise-to-dataset tutorial: shared `1/f` noise, integration-time sampling, and integrated IQ cloud generation |
+| `tutorials/04_two_sensor_multi_qubit_readout.ipynb` | Multi-sensor tutorial: two sensors, multi-qubit charge states, shared noise, and sensor-specific `I/Q` responses |
 | `examples/single_dot_1f_noise.ipynb` | 10 realisations of 1/*f* noise; I and Q time traces per realisation |
 | `examples/two_dot_iq_gif.ipynb` | Two-dot system; Coulomb peak positions; animated IQ comet GIF |
 
@@ -170,7 +181,7 @@ This is automatically visualised in the `two_dot_iq_gif.ipynb` notebook.
 ## Authors
 
 - **Jan A. Krzywda** — j.a.krzywda@liacs.leidenuniv.nl
-- **Rouven K. Koch** — R.K.Koch@tudelft.nl
+- **Rouven Koch** — r.k.koch@tudelft.nl
 
 ## License
 
@@ -181,7 +192,7 @@ MIT — see `pyproject.toml`.
 ```bibtex
 @software{readspyn2025,
   title   = {{ReadSpyn}: RF Reflectometry Readout Simulator for Quantum Dot Systems},
-  author  = {Krzywda, Jan A. and Koch, Rouven K.},
+  author  = {Krzywda, Jan A. and Koch, Rouven},
   year    = {2025},
   url     = {https://github.com/jan-a-krzywda/ReadSpyn}
 }
