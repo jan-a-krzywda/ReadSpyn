@@ -2,28 +2,15 @@
 RLC Sensor Backend Module
 
 This module provides the RLC_sensor class for simulating resonator-based sensors
-used in quantum dot readout systems, with both NumPy and JAX implementations.
+used in quantum dot readout systems.
 """
 
 import numpy as np
-try:
-    import jax
-    import jax.numpy as jnp
-    JAX_AVAILABLE = True
-except ImportError:
-    JAX_AVAILABLE = False
-    # Create dummy jax and jnp for when JAX is not available
-    class DummyJAX:
-        def __getattr__(self, name):
-            raise ImportError("JAX is not available. Install JAX to use JAX features.")
-    jax = DummyJAX()
-    jnp = DummyJAX()
 from scipy.integrate import solve_ivp
 from scipy.interpolate import interp1d
 from scipy.signal import butter, filtfilt
 from numba import njit
 from typing import Dict, Any, Optional, Tuple
-from functools import partial
 
 from .quantum_dot_system import QuantumDotSystem
 from .noise_models import OU_noise
@@ -433,110 +420,4 @@ class RLC_sensor:
         I = I_filt
         Q = Q_filt
 
-
         return I, Q, V_refl_t, times
-    
-    def get_signal_jax(self, times: jax.Array, dot_system: QuantumDotSystem,
-                      charge_state: jax.Array, sensor_index: int, params: Dict[str, Any],
-                      noise_trajectory: jax.Array, key: jax.random.PRNGKey) -> Tuple[jax.Array, jax.Array, jax.Array]:
-        """
-        JAX-compatible signal generation for a given charge state and noise trajectory.
-        
-        Args:
-            times: Time array for simulation
-            dot_system: Quantum dot system
-            charge_state: Charge state vector
-            sensor_index: Index of this sensor
-            params: Simulation parameters
-                - avg_separation: Average separation <d_ij> between charge states
-                - snr: Signal-to-noise ratio for white noise
-                - t_end: End time for SNR calculation
-            noise_trajectory: Precomputed noise trajectory
-            
-        Returns:
-            Tuple[jax.Array, jax.Array, jax.Array]: (I, Q, V_refl_t)
-                - I: In-phase component
-                - Q: Quadrature component  
-                - V_refl_t: Raw reflected voltage
-        """
-        eps0 = params.get('eps0', 0.0) * self.eps_w
-        sensor_voltages = jnp.zeros(dot_system.Cds.shape[1])
-        energy_offset = dot_system.get_energy_offset(charge_state, sensor_voltages, eps0)[sensor_index]
-        
-        # Apply noise trajectory
-        eps_values = noise_trajectory + energy_offset
-        
-        # Calculate conductance values
-        def conductance_fun(eps):
-            return 2 * jnp.cosh(2 * eps / self.eps_w)**(-2) / self.R0
-        
-        conductances = jax.vmap(conductance_fun)(eps_values)
-        
-        # Generate source voltage
-        V_s_t = jnp.sin(self.omega0 * times)
-        
-        # Calculate reflected voltage (simplified model for JAX compatibility)
-        # This is a simplified version that avoids ODE solving for efficiency
-        V_refl_t = V_s_t * (1 - conductances / (conductances + self.Z0))
-        
-        # Extract I and Q components using simplified demodulation
-        # For JAX compatibility, we use a simpler approach than Hilbert transform
-        I = V_refl_t * jnp.cos(self.omega0 * times)
-        Q = V_refl_t * jnp.sin(self.omega0 * times)
-        
-        # Apply low-pass filtering (simplified)
-        def low_pass_filter(signal):
-            # Simple moving average as low-pass filter
-            window_size = min(10, len(signal) // 10)
-            kernel = jnp.ones(window_size) / window_size
-            return jnp.convolve(signal, kernel, mode='same')
-        
-        I = low_pass_filter(I)
-        Q = low_pass_filter(Q)
-        
-        # Add white noise to I and Q before integration
-        # According to the specification:
-        # dI = x<d_ij>dt/2 + sqrt(Y) dw
-        # where Y = <d_ij>/(t_end * snr)
-        avg_separation = params.get('avg_separation', 0.0)
-        snr = params.get('snr', 1.0)
-        t_end = params.get('t_end', times[-1])
-        
-        if avg_separation > 0 and snr > 0:
-            # Calculate time step
-            dt = times[1] - times[0]
-            
-            
-            # Calculate noise variance to get final SNR after integration
-            # We want: final_SNR = signal_separation / noise_std_after_integration = snr
-            # After integration: noise_std_after_integration = sqrt(Y * dt * n_points)
-            # So: snr = signal_separation / sqrt(Y * dt * n_points)
-            # Therefore: Y * dt * n_points = (signal_separation / snr)^2
-            # This gives us: Y = (signal_separation / snr)^2 / (dt * n_points)
-            # Note: Since we have both I and Q components, the total noise variance is 2*Y*dt
-            # So we need to account for the √2 factor: Y = (signal_separation / snr)^2 / (2 * dt * n_points)
-            dt = times[1] - times[0]
-            t_end = times[-1]
-            Y = (avg_separation / snr)**2 * t_end / (dt**2)/2
-            
-            # Generate Wiener process increments
-            # Use a more varied key to ensure different noise for different realizations, charge states, and sensors
-            # Include the charge state in the key to ensure different noise for different states
-            charge_state_hash = jnp.sum(charge_state).astype(jnp.int32) if hasattr(charge_state, 'shape') else 0
-            # Use a more unique key that includes the charge state pattern, not just the sum
-            charge_state_key = jnp.sum(charge_state * jnp.arange(len(charge_state))).astype(jnp.int32)
-            noise_key = jax.random.fold_in(key, jnp.sum(noise_trajectory).astype(jnp.int32) + sensor_index * 1000 + charge_state_key * 100)
-            
-            # Generate Wiener process increments (dw) - these should be different for each time step
-            dw_I = jax.random.normal(noise_key, shape=I.shape) * jnp.sqrt(dt)
-            dw_Q = jax.random.normal(jax.random.fold_in(noise_key, 1), shape=Q.shape) * jnp.sqrt(dt)
-            
-            # Add white noise: dI = sqrt(Y) dw
-            # The signal component should come from the underlying I and Q signals, not be added separately
-            noise_component_I = jnp.sqrt(Y) * dw_I
-            noise_component_Q = jnp.sqrt(Y) * dw_Q
-            
-            I = I + noise_component_I
-            Q = Q + noise_component_Q
-        
-        return I, Q, V_refl_t

@@ -32,3 +32,7 @@ test_*.py
 # OS files
 .DS_Store
 Thumbs.db
+
+*.tex
+
+*.pdf

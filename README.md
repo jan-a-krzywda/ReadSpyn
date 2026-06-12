@@ -3,7 +3,6 @@
 <div align="center">
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![JAX](https://img.shields.io/badge/JAX-0.4.0+-orange.svg)](https://github.com/google/jax)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 </div>
@@ -25,7 +24,6 @@ experimental time series.
 | **Flexible noise models** | Spectrum-prescribed 1/*f* noise (`SpectrumNoise`), Ornstein–Uhlenbeck (`OU_noise`), telegraph |
 | **Multi-dot / multi-sensor** | Capacitance-matrix formalism; arbitrary *N* dots × *M* sensors |
 | **IQ demodulation** | Hilbert-transform demodulation with window-padding edge correction |
-| **JAX back-end** | Optional JAX path (`jax_simulator.py`) for GPU/TPU acceleration and `jax.scan` state sweeps |
 | **Animated output** | Animated GIF of IQ-plane comet trajectories |
 
 ---
@@ -39,8 +37,7 @@ ReadSpyn/
 │       ├── __init__.py            # public API: QuantumDotSystem, RLC_sensor
 │       ├── quantum_dot_system.py  # CI model, capacitance matrices, energy offsets
 │       ├── sensor_backend.py      # RLC ODE, IQ demodulation, get_signal()
-│       ├── noise_models.py        # SpectrumNoise, OU_noise, telegraph noise
-│       ├── jax_simulator.py       # optional JAX-based simulator
+│       ├── noise_models.py        # SpectrumNoise, OU_noise, OverFNoise, CorrelatedNoise
 │       ├── iaaft.py               # IAAFT surrogate time-series helper
 │       └── helper_functions.py    # shared utilities
 │
@@ -69,7 +66,7 @@ cd ReadSpyn
 pip install -e .
 ```
 
-JAX is an optional but recommended dependency for the JAX back-end:
+JAX is an optional dependency (only needed for legacy `jax_simulator.py`):
 
 ```bash
 pip install jax jaxlib          # CPU
